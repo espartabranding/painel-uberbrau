@@ -1,0 +1,920 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Radar Uberbrau</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* Linguagem visual no padrão IBM Carbon: IBM Plex, cantos retos, sem sombra, camadas de cinza e azul de ação.
+   O amarelo da Uberbrau fica só onde é marca (os pontos dela no mapa e o logo). */
+:root{--bg:#ffffff;--bg2:#f4f4f4;--card:#ffffff;--card2:#f4f4f4;--line:#e0e0e0;--line2:#c6c6c6;--tx:#161616;--tx2:#525252;--tx3:#6f6f6f;
+  --ac:#0f62fe;--ac-h:#0353e9;--ac2:#0f62fe;--on-ac:#ffffff;--marca:#f2a516;--ok:#198038;--warn:#f1c21b;--bad:#da1e28;--pu:#8a3ffc;--pk:#ee5396;--bl:#0f62fe;--r:0px;--sh:none;--sel:#e8f0fe}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#161616;--bg2:#262626;--card:#262626;--card2:#393939;--line:#393939;--line2:#525252;--tx:#f4f4f4;--tx2:#c6c6c6;--tx3:#a8a8a8;--ac:#4589ff;--ac-h:#78a9ff;--ac2:#78a9ff;--on-ac:#161616;--ok:#42be65;--bad:#fa4d56;--sel:#1c2a44}}
+:root[data-theme="dark"]{--bg:#161616;--bg2:#262626;--card:#262626;--card2:#393939;--line:#393939;--line2:#525252;--tx:#f4f4f4;--tx2:#c6c6c6;--tx3:#a8a8a8;--ac:#4589ff;--ac-h:#78a9ff;--ac2:#78a9ff;--on-ac:#161616;--ok:#42be65;--bad:#fa4d56;--sel:#1c2a44}
+*{box-sizing:border-box}html,body{margin:0;height:100%}
+body{font-family:"IBM Plex Sans","Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.43;letter-spacing:.16px}
+.mono,.kpi .v,.score,th,.navsec,.pill,.hbar .n{font-family:"IBM Plex Mono",Menlo,monospace}
+a{color:var(--ac);text-decoration:none}a:hover{text-decoration:underline}
+.app{display:grid;grid-template-columns:256px 1fr;height:100vh}
+nav{background:var(--bg2);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:0 0 12px;gap:0;overflow:auto}
+.brand{display:flex;gap:12px;align-items:center;padding:0 16px;height:48px;border-bottom:1px solid var(--line);margin-bottom:8px;background:var(--bg)}
+.logo{width:28px;height:28px;background:var(--marca);display:grid;place-items:center;font-weight:600;color:#161616;font-size:14px}
+.brand b{font-size:14px;font-weight:600;display:block}.brand small{color:var(--tx3);font-size:12px}
+.navsec{font-size:11px;letter-spacing:.32px;text-transform:uppercase;color:var(--tx3);margin:16px 16px 6px}
+nav button{all:unset;cursor:pointer;display:flex;gap:12px;align-items:center;padding:0 16px;height:40px;color:var(--tx2);font-weight:400;font-size:14px;border-left:3px solid transparent}
+nav button:hover{background:var(--card2);color:var(--tx)}
+nav button.on{background:var(--card2);color:var(--tx);font-weight:600;border-left-color:var(--ac)}
+nav .ic{width:16px;text-align:center}
+nav .foot{margin-top:auto;padding:12px 16px 0;color:var(--tx3);font-size:12px;border-top:1px solid var(--line)}
+main{overflow:auto;position:relative}
+.top{position:sticky;top:0;z-index:500;display:flex;gap:0;align-items:center;padding:0 32px;height:48px;background:var(--bg);border-bottom:1px solid var(--line)}
+.search{flex:1;max-width:640px;position:relative;height:100%}
+.search input{width:100%;height:100%;padding:0 16px 0 40px;border:0;border-bottom:1px solid transparent;background:transparent;color:var(--tx);font:inherit;outline:none}
+.search input:focus{outline:2px solid var(--ac);outline-offset:-2px}.search .mag{position:absolute;left:14px;top:13px;color:var(--tx3)}
+.sres{position:absolute;top:48px;left:0;right:0;background:var(--card);border:1px solid var(--line);max-height:460px;overflow:auto;display:none;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.sres .it{padding:10px 16px;cursor:pointer;display:flex;gap:10px;align-items:center;border-bottom:1px solid var(--line)}
+.sres .it:hover{background:var(--card2)}
+.pill{font-size:11px;padding:2px 8px;border-radius:12px;background:var(--card2);color:var(--tx2);white-space:nowrap}
+.btn{all:unset;cursor:pointer;padding:0 16px;height:40px;display:inline-flex;align-items:center;gap:8px;background:transparent;border:1px solid var(--ac);color:var(--ac);font-size:14px;white-space:nowrap}
+.btn:hover{background:var(--sel)}.btn.pri{background:var(--ac);color:var(--on-ac);padding-right:48px;position:relative}.btn.pri:hover{background:var(--ac-h)}
+.btn.pri:after{content:"→";position:absolute;right:16px}
+#tema{border:0;color:var(--tx2);margin-left:auto;width:48px;justify-content:center;padding:0}
+.page{display:none;padding:32px 32px 64px;animation:f .2s}.page.on{display:block}
+@keyframes f{from{opacity:0}}
+h1{font-size:32px;font-weight:300;margin:0 0 8px;line-height:1.25;letter-spacing:0}h2{font-size:16px;font-weight:600;margin:0 0 12px}h3{font-size:14px;font-weight:600;margin:0 0 8px}
+.sub{color:var(--tx2);margin:0 0 24px;max-width:900px;font-size:16px;line-height:1.5}
+.grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--bg2);border:0;border-radius:0;padding:16px;min-width:0}
+.kpi{position:relative;border-top:3px solid var(--kc,var(--ac));padding-top:14px}
+.kpi .v{font-size:28px;font-weight:400;letter-spacing:-.5px;margin-top:6px}.kpi .l{color:var(--tx2);font-size:14px}.kpi .s{color:var(--tx3);font-size:12px;margin-top:6px}
+.hero{background:var(--bg);border:0;border-bottom:1px solid var(--line);padding:16px 0 32px;margin-bottom:24px}
+.hero h1{font-size:42px;font-weight:300;max-width:900px;line-height:1.2}
+.flow{display:flex;gap:1px;flex-wrap:wrap;background:var(--line);border:1px solid var(--line)}.flow .st{flex:1;min-width:140px;background:var(--bg2);padding:16px}
+.flow .st b{display:block;font-size:14px;font-weight:600}.flow .st span{color:var(--tx2);font-size:12px}.flow .ar{display:none}
+.chips{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px}
+.chip{all:unset;cursor:pointer;font-size:12px;padding:0 12px;height:32px;display:inline-flex;align-items:center;border-radius:16px;background:var(--card2);color:var(--tx)}
+.chip:hover{background:var(--line2)}.chip.on{background:var(--ac);color:var(--on-ac)}
+.bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:16px}
+select,input[type=text]{background:var(--bg2);color:var(--tx);border:0;border-bottom:1px solid var(--line2);border-radius:0;padding:0 12px;height:40px;font:inherit;outline:none;max-width:100%}
+select:focus,input[type=text]:focus{outline:2px solid var(--ac);outline-offset:-2px}
+label.ck{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--tx2);cursor:pointer}
+input[type=checkbox],input[type=range]{accent-color:var(--ac)}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th{position:sticky;top:0;z-index:2;background:var(--line);text-align:left;color:var(--tx);font-weight:600;font-size:12px;letter-spacing:.32px;padding:0 16px;height:48px;white-space:nowrap}
+td{padding:12px 16px;border-bottom:1px solid var(--line);vertical-align:top;background:var(--bg2)}
+tr.cl{cursor:pointer}tr.cl:hover td{background:var(--card2)}
+.tw{max-height:640px;overflow:auto;border:0;background:var(--bg2)}
+.score{display:inline-grid;place-items:center;width:32px;height:32px;font-weight:500;font-size:13px;color:#fff;flex:none}
+.muted{color:var(--tx3)}.small{font-size:12px}.ok{color:var(--ok)}
+.tagc{display:inline-block;font-size:12px;padding:2px 8px;border-radius:12px;margin:2px 4px 2px 0;background:var(--card2);color:var(--tx2);border:0;border-left:3px solid var(--line2)}
+.wa{color:var(--ok);font-weight:600}
+.drawer{position:fixed;top:0;right:0;width:min(720px,96vw);height:100vh;background:var(--bg);border-left:1px solid var(--line);box-shadow:-2px 0 12px rgba(0,0,0,.18);z-index:2000;transform:translateX(105%);transition:transform .24s cubic-bezier(.2,0,.38,.9);display:flex;flex-direction:column}
+.drawer.on{transform:none}.dhead{padding:24px 24px 16px;border-bottom:1px solid var(--line);position:relative}.dbody{padding:24px;overflow:auto;flex:1}
+.x{position:absolute;right:16px;top:16px;border:0;color:var(--tx2);padding:0 12px}
+.veil{position:fixed;inset:0;background:rgba(22,22,22,.5);z-index:1900;display:none}.veil.on{display:block}
+.kv{display:grid;grid-template-columns:160px 1fr;gap:8px 16px;font-size:14px}.kv dt{color:var(--tx3)}.kv dd{margin:0;overflow-wrap:anywhere}
+.news{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--line);align-items:flex-start}.news:last-child{border-bottom:0}
+.quote{border-left:3px solid var(--ac);padding:12px 16px;background:var(--card2);font-size:14px}
+.map{height:520px;border:0;overflow:hidden;z-index:1}
+.leaflet-container{background:var(--card2);font-family:"IBM Plex Sans",Arial,sans-serif}
+.leaflet-popup-content-wrapper,.leaflet-popup-tip{border-radius:0}
+.rng{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--tx2);min-width:140px}
+.hbar{display:flex;align-items:center;gap:8px;font-size:12px;margin:6px 0}.hbar .t{width:220px;color:var(--tx2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.hbar .b{flex:1;height:8px;background:var(--card2)}.hbar .b i{display:block;height:100%;background:var(--ac)}.hbar .n{width:64px;text-align:right;color:var(--tx3)}
+.cap{font-size:12px;color:var(--tx3);margin-top:8px}.empty{padding:32px;text-align:center;color:var(--tx3)}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--tx2);margin-top:8px}.legend i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.load{position:fixed;inset:0;display:grid;place-items:center;background:var(--bg);z-index:9999;color:var(--tx2)}
+.gcorp{grid-template-columns:1.4fr 1fr}
+@media(max-width:1100px){.gcorp{grid-template-columns:1fr}.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.app{grid-template-columns:1fr}nav{display:none}.g4,.g3,.g2,.gcorp{grid-template-columns:1fr}.page{padding:16px}.kv{grid-template-columns:1fr}.top{padding:0 16px}.hero h1{font-size:30px}}
+</style>
+<meta name="robots" content="noindex,nofollow">
+<meta name="referrer" content="no-referrer">
+</head>
+<body>
+<div class="load" id="load">Carregando o radar…</div>
+<div class="app">
+<nav>
+  <div class="brand"><div class="logo">U</div><div><b>Radar Uberbrau</b><small>Uberlândia · Espaço, chopp e bar</small></div></div>
+  <button data-p="inicio" class="on"><span class="ic">◎</span>Visão geral</button>
+  <div class="navsec">Espaço Überbräu</div>
+  <button data-p="corp"><span class="ic">▣</span>Quem contrata evento</button>
+  <button data-p="espacos"><span class="ic">⚔</span>Espaços concorrentes</button>
+  <div class="navsec">Quem traz o evento</div>
+  <button data-p="eventos"><span class="ic">★</span>Produtoras, cerimoniais, bufês</button>
+  <button data-p="vitrine"><span class="ic">◈</span>Na agenda da cidade</button>
+  <div class="navsec">Chopp e bar</div>
+  <button data-p="pdv"><span class="ic">⌂</span>Bares, adegas e PDV</button>
+  <button data-p="concorrencia"><span class="ic">⚑</span>Concorrência no chopp</button>
+  <button data-p="mercado"><span class="ic">▥</span>Cervejarias registradas</button>
+  <div class="navsec">Marca e reputação</div>
+  <button data-p="opinioes"><span class="ic">✎</span>Comentários no Google</button>
+  <button data-p="redes"><span class="ic">◐</span>Instagram e buscas</button>
+  <div class="navsec">Território</div>
+  <button data-p="mapa"><span class="ic">◍</span>Mapa & expansão</button>
+  <button data-p="raio"><span class="ic">◎</span>Estudo de raio</button>
+  <button data-p="publico"><span class="ic">☷</span>Público por bairro</button>
+  <button data-p="consumo"><span class="ic">⌁</span>Consumo e calendário</button>
+  <button data-p="cidade"><span class="ic">▤</span>Economia e mídia local</button>
+  <button data-p="univ"><span class="ic">✦</span>Universitários</button>
+  <button data-p="clima"><span class="ic">☀</span>Clima e sazonalidade</button>
+  <div class="navsec">Plataforma</div>
+  <button data-p="bases"><span class="ic">⛁</span>Bases de dados</button>
+  <div class="foot" id="foot"></div>
+</nav>
+<main id="main">
+  <div class="top">
+    <div class="search"><span class="mag">⌕</span><input id="q" placeholder="Buscar empresa, sócio, bairro, espaço…" autocomplete="off"><div class="sres" id="sres"></div></div>
+    <button class="btn" id="tema" title="Claro / escuro">◐</button>
+  </div>
+
+  <section class="page on" id="p-inicio">
+    <div class="hero">
+      <div class="small muted" style="letter-spacing:.12em;text-transform:uppercase;margin-bottom:6px">Uberbrau · primeira cervejaria artesanal do Triângulo, desde 2008</div>
+      <h1>Quem faz evento em Uberlândia — e como levá-lo para o Espaço Überbräu, com o chopp da casa.</h1>
+      <p class="sub" style="margin-top:8px">A Uberbrau tem três negócios, e este radar cobre os três: o <b>Espaço Überbräu</b>, que recebe eventos corporativos, sociais e culturais; o <b>chopp para eventos</b>, em barril, no local que o cliente escolher; e o <b>bar</b> do Mercado Municipal. Cruza a <b>Receita Federal</b>, o <b>Google Maps</b>, o <b>Censo 2022</b>, o <b>CAGED</b>, o <b>INEP</b> e a <b>agenda pública da cidade</b>.</p>
+      <div class="grid g3" id="frentes" style="margin-top:16px"></div>
+    </div>
+    <div class="card" style="margin-bottom:16px"><h2>O que os dados dizem</h2><div id="achados"></div></div>
+    <div class="grid g4" id="kpis"></div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card"><h2>Evento corporativo — as 10 primeiras empresas</h2><div id="top10c"></div><div class="cap">Nota = porte, capital, matriz em Uberlândia, número de unidades, setor e distância até o Espaço. <a href="javascript:void 0" onclick="ir('corp')">Ver todas →</a></div></div>
+      <div class="card"><h2>Quem traz o evento — os 10 primeiros</h2><div id="top10"></div><div class="cap">Produtoras, comissões de formatura, bufês e cerimoniais: indicam o Espaço e compram o chopp. <a href="javascript:void 0" onclick="ir('eventos')">Ver todos →</a></div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Ecossistema de eventos por tipo</h2><canvas id="chSeg" height="260"></canvas></div>
+  </section>
+
+  <section class="page" id="p-corp">
+    <h1>Quem contrata evento corporativo</h1><p class="sub">Empresas e entidades de Uberlândia com porte para fazer convenção, confraternização, treinamento, assembleia ou lançamento — o comprador do Espaço Überbräu. Sai da Receita Federal: porte, capital social, onde fica a matriz (quem decide), quantas unidades há na cidade, administradores e contato registrado. O evento típico de cada setor é <b>hipótese</b> pelo setor, não informação da empresa.</p>
+    <div class="grid g4" id="cpK"></div>
+    <div class="chips" id="fSet" style="margin-top:14px"></div>
+    <div class="bar">
+      <input type="text" id="cpQ" placeholder="Empresa, sócio, bairro…" style="min-width:240px">
+      <select id="cpLoc"><option value="">Matriz em qualquer lugar</option><option value="1">Matriz em Uberlândia</option><option value="0">Filial (matriz fora)</option></select>
+      <select id="cpKm"><option value="">Qualquer distância</option><option value="5">Até 5 km do Espaço</option><option value="10">Até 10 km</option></select>
+      <label class="ck"><input type="checkbox" id="cpPub"> incluir setor público</label>
+      <label class="ck"><input type="checkbox" id="cpCel"> com celular</label>
+      <span class="muted small" id="cpN"></span>
+      <button class="btn pri" style="margin-left:auto" onclick="csvCorp()">⇩ Baixar lista</button>
+    </div>
+    <div class="grid gcorp">
+      <div class="tw" style="max-height:640px"><table><thead><tr><th>Nota</th><th>Empresa</th><th>Setor</th><th>Porte</th><th>Matriz</th><th>Contato</th><th>Distância</th></tr></thead><tbody id="tCorp"></tbody></table></div>
+      <div class="card"><div class="map" id="mapCorp" style="height:610px"></div><div class="cap">Círculo = empresa (tamanho = unidades na cidade). Amarelo com borda branca = Espaço Überbräu. Anéis de 5 e 10 km.</div></div>
+    </div>
+    <div class="cap" id="cpCap"></div>
+  </section>
+
+  <section class="page" id="p-espacos">
+    <h1>Espaços concorrentes</h1><p class="sub">Quem disputa o mesmo evento que o Espaço Überbräu: centros de convenções, salões de festa e de casamento, chácaras, casas de show. Google Maps (nota e número de avaliações = quanto público cada um já recebeu), distância até o Espaço e o que os convidados dizem da <b>bebida</b> nesses lugares — o argumento de quem tem o chopp feito na própria casa.</p>
+    <div class="grid g4" id="esK"></div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>O Espaço Überbräu, pelo que ele mesmo declara</h2><div id="esFicha"></div></div>
+      <div class="card"><h2>A vitrine no Google</h2><div id="esVit"></div></div>
+    </div>
+    <div class="chips" id="fCls" style="margin-top:16px"></div>
+    <div class="bar"><input type="text" id="esQ" placeholder="Nome, bairro…" style="min-width:240px"><label class="ck"><input type="checkbox" id="esBev"> só quem tem crítica à bebida</label><span class="muted small" id="esN"></span><button class="btn pri" style="margin-left:auto" onclick="csvEsp()">⇩ Baixar</button></div>
+    <div class="grid g2"><div class="tw" style="max-height:600px"><table><thead><tr><th>Espaço</th><th>Tipo</th><th>Google</th><th>Bebida</th><th>Distância</th><th>Contato</th></tr></thead><tbody id="tEsp"></tbody></table></div><div class="card"><div class="map" id="mapEsp" style="height:570px"></div><div class="cap">Tamanho = avaliações no Google · vermelho = tem crítica à bebida nos comentários · amarelo = Espaço Überbräu.</div></div></div>
+    <div class="card" style="margin-top:16px"><h2>O que dizem da bebida nos espaços concorrentes</h2><div id="esCrit" style="max-height:520px;overflow:auto"></div><div class="cap">Comentários de 1 a 3 estrelas que falam de chopp ou bebida (Google Maps). Lista completa em «Comentários no Google».</div></div>
+  </section>
+
+  <section class="page" id="p-eventos">
+    <h1>Produtoras, cerimoniais e bufês — quem traz o evento</h1><p class="sub">Empresas ativas na Receita cuja atividade (principal ou secundária) é organizar, produzir, servir ou estruturar eventos — fora as casas de eventos, que concorrem com o Espaço. São o canal das duas frentes: indicam o <b>Espaço Überbräu</b> ao cliente e compram o <b>chopp</b> para o evento fora. Para cada uma: sócios, contato registrado, nota de prioridade e a mensagem sugerida. Clique para abrir a ficha.</p>
+    <div class="chips" id="fSeg"></div>
+    <div class="bar">
+      <input type="text" id="feQ" placeholder="Nome, sócio, bairro…" style="min-width:240px">
+      <select id="feBai"><option value="">Todos os bairros</option></select>
+      <select id="fePorte"><option value="">Todo porte</option><option value="nmei">Sem MEI</option><option value="mei">Só MEI</option></select>
+      <label class="ck"><input type="checkbox" id="feCel"> com celular</label>
+      <label class="ck"><input type="checkbox" id="feMail"> com e-mail</label>
+      <label class="ck" title="desmarcado, entra também quem declara organizar festas, bufê ou som como atividade secundária"><input type="checkbox" id="fePrinc" checked> só atividade principal</label>
+      <span class="muted small" id="feN"></span>
+      <button class="btn pri" style="margin-left:auto" onclick="csvAlvos('evento')">⇩ Baixar lista</button>
+    </div>
+    <div class="tw"><table><thead><tr><th>Nota</th><th>Empresa</th><th>Tipo</th><th>Responsáveis (sócios)</th><th>Contato</th><th>Bairro</th><th>Casa</th></tr></thead><tbody id="tEv"></tbody></table></div>
+    <div class="cap">Contato = telefone e e-mail que a própria empresa registrou na Receita Federal (dado público). Celular costuma ser WhatsApp do dono em empresa pequena. Use para contato comercial B2B, com opção de descadastro (LGPD, legítimo interesse).</div>
+  </section>
+
+  <section class="page" id="p-vitrine">
+    <h1>Na agenda da cidade</h1><p class="sub">Quem aparece produzindo os eventos de Uberlândia em fontes públicas — bilheterias, sites, imprensa — e o calendário anual da cidade, para a Uberbrau planejar o semestre.</p>
+    <div class="grid g2">
+      <div class="card"><h2>Organizadores com evento público</h2><div class="bar"><input type="text" id="fvQ" placeholder="Filtrar…"><select id="fvT"><option value="">Todo tipo</option></select><span class="muted small" id="fvN"></span></div><div id="lPub" style="max-height:680px;overflow:auto"></div></div>
+      <div class="card"><h2>Calendário de eventos da cidade</h2><div id="lCal" style="max-height:760px;overflow:auto"></div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>No Google Maps — quem faz e onde acontece evento</h2>
+      <div class="bar"><input type="text" id="fmQ" placeholder="Nome, bairro, categoria…" style="min-width:240px"><select id="fmT"><option value="">Todo tipo</option></select><label class="ck"><input type="checkbox" id="fmSo"> só quem não está na Receita</label><span class="muted small" id="fmN"></span><button class="btn pri" style="margin-left:auto" onclick="csvMaps()">⇩ Baixar</button></div>
+      <div class="tw" style="max-height:620px"><table><thead><tr><th>Lugar</th><th>Tipo</th><th>Google</th><th>Contato</th><th>Endereço</th><th></th></tr></thead><tbody id="tMaps"></tbody></table></div>
+      <div class="cap">Telefone, site e Instagram que o próprio lugar publica no Google. «Ficha Receita» aparece quando o telefone ou o nome casam com um CNPJ ativo.</div></div>
+  </section>
+
+  <section class="page" id="p-pdv">
+    <h1>Bares, adegas e pontos de venda</h1><p class="sub">Onde o chopp e os rótulos da Uberbrau podem estar todo dia: bares, casas noturnas, adegas, restaurantes e hotéis — com sócio e contato.</p>
+    <div class="chips" id="fPdv"></div>
+    <div class="bar"><input type="text" id="fpQ" placeholder="Nome, bairro…" style="min-width:240px"><label class="ck"><input type="checkbox" id="fpCel"> com celular</label><span class="muted small" id="fpN"></span><button class="btn pri" style="margin-left:auto" onclick="csvAlvos('pdv')">⇩ Baixar lista</button></div>
+    <div class="grid g2"><div class="tw" style="max-height:560px"><table><thead><tr><th>Nota</th><th>Empresa</th><th>Tipo</th><th>Contato</th><th>Bairro</th></tr></thead><tbody id="tPdv"></tbody></table></div><div class="card"><div class="map" id="mapPdv" style="height:530px"></div><div class="cap">● Receita Federal · ○ só no Google Maps (tamanho = avaliações)</div></div></div>
+  </section>
+
+  <section class="page" id="p-concorrencia">
+    <h1>Concorrência no chopp</h1><p class="sub">Quem disputa a mesma torneira e o mesmo barril de evento em Uberlândia (os concorrentes do Espaço estão em «Espaços concorrentes»): cervejarias e microcervejarias, chopperias e delivery de chopp, distribuidoras de bebida. Google Maps (nota e número de avaliações = quanto público cada um já conquistou) somado à Receita Federal (quem tem CNPJ ativo e desde quando).</p>
+    <div class="grid g4" id="conK"></div>
+    <div class="chips" id="fCon" style="margin-top:14px"></div>
+    <div class="bar"><input type="text" id="fcQ" placeholder="Nome, bairro…" style="min-width:240px"><span class="muted small" id="fcN"></span><button class="btn pri" style="margin-left:auto" onclick="csvCon()">⇩ Baixar concorrentes</button></div>
+    <div class="grid g2"><div class="tw" style="max-height:600px"><table><thead><tr><th>Concorrente</th><th>Tipo</th><th>Google</th><th>Contato</th><th>Onde</th><th>Fonte</th></tr></thead><tbody id="tCon"></tbody></table></div><div class="card"><div class="map" id="mapCon" style="height:570px"></div><div class="cap">Tamanho do círculo = avaliações no Google. Círculo amarelo com borda branca = Uberbrau.</div></div></div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card"><h2>Quem concentra a atenção do público</h2><div id="conTop"></div><div class="cap">Avaliações no Google Maps — o melhor indicador público de movimento que existe para bar e cervejaria.</div></div>
+      <div class="card"><h2>Bairros com público e sem concorrente</h2><div class="tw" style="max-height:420px"><table><thead><tr><th>Bairro</th><th>25–39</th><th>Renda resp.</th><th>Concorrentes a 1,5 km</th><th>Bares a 1,5 km</th></tr></thead><tbody id="tBranco"></tbody></table></div><div class="cap">Bairros com mais de 2 mil moradores, ordenados por adultos de 25 a 39 anos por concorrente próximo. Clique para estudar o raio.</div></div>
+    </div>
+  </section>
+
+  <section class="page" id="p-mapa">
+    <h1>Mapa & expansão</h1><p class="sub">Uberlândia inteira em camadas: os pontos da Uberbrau, cada concorrente, quem faz evento, onde o evento acontece, onde se bebe, onde mora o público e onde estão as universidades. Em amarelo, as áreas com mais público e menos concorrência para um novo ponto ou uma degustação. Clique em qualquer lugar do mapa para estudar o raio.</p>
+    <div class="chips" id="fCamada"></div>
+    <div class="map" id="mapa" style="height:640px"></div>
+    <div class="legend" id="legMapa"></div>
+    <div class="card" style="margin-top:14px"><h2>Onde abrir um ponto ou fazer degustação</h2>
+      <p class="small muted" style="margin:-6px 0 10px">Grade de 500 m. Nota = adultos de 25 a 39 anos e renda (Censo 2022) + bares, adegas e empresas de evento a 1 km (Receita e Google Maps) − cervejarias e distribuidoras a 1 km − proximidade de um ponto que a Uberbrau já tem. É cruzamento de cadastro, não contagem de fluxo de pessoas.</p>
+      <div class="tw" style="max-height:520px"><table><thead><tr><th>#</th><th>Área</th><th>Nota</th><th>25–39 a 1 km</th><th>Renda resp.</th><th>Bares/adegas</th><th>Evento</th><th>Concorrentes</th><th>Por quê</th></tr></thead><tbody id="tExp"></tbody></table></div>
+      <div style="margin-top:10px"><button class="btn" onclick="csvExp()">⇩ Baixar áreas</button></div></div>
+  </section>
+
+  <section class="page" id="p-opinioes">
+    <h1>O que dizem no Google</h1><p class="sub">Os comentários mais recentes do Google Maps sobre a Uberbrau e os concorrentes que mais concentram público. O tema sai das palavras do comentário; se é elogio ou crítica, da nota que a pessoa deu (4–5 elogio, 1–3 crítica). Sem nome nem foto de quem comentou.</p>
+    <div class="grid g4" id="opK"></div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>A leitura</h2><div id="opLeit"></div></div>
+      <div class="card"><h2>Temas: Uberbrau × concorrentes</h2><div class="tw" style="max-height:420px"><table><thead><tr><th>Tema</th><th>Uberbrau</th><th>Concorrentes</th></tr></thead><tbody id="tTemas"></tbody></table></div><div class="cap">Menções em elogios / em críticas, na amostra lida. Clique num tema para ler os comentários.</div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Lugar a lugar</h2><div class="tw" style="max-height:460px"><table><thead><tr><th>Lugar</th><th>Google</th><th>Lidos</th><th>Período</th><th>Críticas</th><th>Dono respondeu</th><th>Mais elogiado</th><th>Mais criticado</th></tr></thead><tbody id="tOp"></tbody></table></div></div>
+    <div class="card" style="margin-top:16px" id="bevCard"><h2>A bebida nos espaços de evento, bufês e cerimoniais</h2><p class="muted small" style="margin-top:-6px" id="bevSub"></p>
+      <div class="tw" style="max-height:300px;margin-bottom:12px"><table><thead><tr><th>Lugar</th><th>Google</th><th>Falam da bebida</th><th>Críticas</th></tr></thead><tbody id="tBev"></tbody></table></div>
+      <div class="bar"><select id="bevL"></select><select id="bevN"><option value="">Toda nota</option><option value="c">Só críticas (1–3)</option><option value="e">Só elogios (4–5)</option></select><span class="muted small" id="bevCnt"></span></div>
+      <div id="bevLista" style="max-height:520px;overflow:auto"></div></div>
+    <div class="card" style="margin-top:16px"><h2>Ler os comentários</h2>
+      <div class="bar"><select id="opL"></select><select id="opT"><option value="">Todo tema</option></select><select id="opN"><option value="">Toda nota</option><option value="c">Só críticas (1–3)</option><option value="e">Só elogios (4–5)</option></select><input type="text" id="opQ" placeholder="Buscar palavra…"><span class="muted small" id="opCnt"></span></div>
+      <div id="opLista" style="max-height:640px;overflow:auto"></div></div>
+  </section>
+
+  <section class="page" id="p-mercado">
+    <h1>Cervejarias registradas e o movimento do mercado</h1><p class="sub">Quem fabrica cerveja de fato, com registro no Ministério da Agricultura — não quem só revende — e quantos bares, bufês, distribuidoras e casas de evento abriram e fecharam em Uberlândia a cada ano, pela Receita Federal.</p>
+    <div class="grid g4" id="mkK"></div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>Cervejarias com fábrica em Uberlândia</h2><div class="tw" style="max-height:420px"><table><thead><tr><th>Cervejaria</th><th>CNPJ</th><th>Registro MAPA</th></tr></thead><tbody id="tMk"></tbody></table></div><div class="cap" id="mkCap"></div></div>
+      <div class="card"><h2>Minas Gerais — onde há mais cervejarias</h2><div id="mkMg"></div><div class="cap">SIPEAGRO (MAPA): registros ativos com fábrica própria, por município.</div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Triângulo Mineiro e Alto Paranaíba — fora de Uberlândia</h2><div class="tw" style="max-height:360px"><table><thead><tr><th>Município</th><th>Cervejaria</th><th>Registro</th></tr></thead><tbody id="tMkR"></tbody></table></div></div>
+    <div class="card" style="margin-top:16px"><h2>Abriu × fechou, por ano</h2>
+      <div class="bar"><select id="dnS"></select><span class="muted small" id="dnTxt"></span></div>
+      <canvas id="chDin" height="110"></canvas><div class="cap" id="dnCap"></div></div>
+    <div class="card" style="margin-top:16px" id="cgCard"><h2>Emprego formal — admissões e desligamentos (CAGED)</h2>
+      <p class="muted small" style="margin-top:-6px">Mesmo segmento escolhido acima. Saldo positivo = o setor está contratando: casa, bufê e bar que contratam estão crescendo e compram mais. ⚠️ No CAGED, «organizador» inclui a promoção de vendas (CNAE 7319-0/02): quem mais é contratado ali é repositor, atendente de loja e promotor — não produtora de evento. Veja a coluna «Quem mais contrata».</p>
+      <canvas id="chCg" height="150"></canvas>
+      <div class="tw" style="margin-top:16px;max-height:420px"><table><thead><tr><th>Segmento</th><th>Admissões 12m</th><th>Desligamentos</th><th>Saldo</th><th>Salário de entrada</th><th>Quem mais contrata</th></tr></thead><tbody id="tCg"></tbody></table></div>
+      <div class="cap" id="cgCap"></div></div>
+  </section>
+
+  <section class="page" id="p-redes">
+    <h1>Instagram e buscas no Google</h1><p class="sub">O tamanho e o ritmo de cada marca no Instagram — só perfis confirmados pelo site ou pela ficha do Google Maps — e o que Minas Gerais procura no Google sobre chopp. Índice do Google Trends é relativo (0–100), não volume.</p>
+    <div class="grid g4" id="igK"></div>
+    <div class="card" style="margin-top:16px"><h2>Perfis no Instagram</h2><div class="tw"><table><thead><tr><th>Perfil</th><th>Seguidores</th><th>Posts</th><th>Posts / mês</th><th>Curtidas por post</th><th>Engajamento</th><th>Vídeo</th><th>Último post</th></tr></thead><tbody id="tIg"></tbody></table></div><div class="cap">Engajamento = (curtidas + comentários) dos 12 posts mais recentes ÷ seguidores. Posts/mês sobre o intervalo desses 12 posts. Clique para ver os posts.</div></div>
+    <div class="card" style="margin-top:16px"><h2>Posts recentes</h2><div class="bar"><select id="igP"></select><input type="text" id="igQ" placeholder="Buscar palavra na legenda…"><span class="muted small" id="igN"></span></div><div id="igL" style="max-height:560px;overflow:auto"></div></div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>Interesse por «chopp» em Minas — 5 anos</h2><canvas id="chTr" height="220"></canvas><div class="cap" id="trCap"></div></div>
+      <div class="card"><h2>Marcas no Google (MG, 5 anos)</h2><div id="trMarcas"></div><div class="cap" id="trMcap"></div></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>O que se busca junto com «chopp»</h2><div id="trTop"></div></div>
+      <div class="card"><h2>Buscas em alta</h2><div id="trRis"></div><div class="cap">Crescimento relativo nos últimos 12 meses (MG).</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px" id="trGeo">
+      <div class="card"><h2>«Chopp» por estado — 5 anos</h2><div id="trEst"></div></div>
+      <div class="card"><h2>«Chopp» por cidade em Minas</h2><div id="trCid" style="max-height:460px;overflow:auto"></div><div class="cap" id="trCidCap"></div></div>
+    </div>
+  </section>
+
+  <section class="page" id="p-raio">
+    <h1>Estudo de raio</h1><p class="sub">Clique em qualquer lugar de Uberlândia e veja tudo em volta: moradores e renda (Censo 2022), quantos adultos de 25 a 39 anos, empresas, bares e quem faz evento. Serve para escolher onde abrir um ponto, fazer degustação ou concentrar a prospecção.</p>
+    <div class="card" style="margin-bottom:14px"><div class="bar" style="margin:0">
+      <label class="rng">Raio<select id="rzR"><option value="500">500 m</option><option value="1000" selected>1 km</option><option value="2000">2 km</option><option value="3000">3 km</option></select></label>
+      <label class="rng">Ir para o bairro<select id="rzB"><option value="">— escolha —</option></select></label>
+      <label class="rng" style="min-width:260px">Atividade (concorrência / alvo)<input type="text" id="rzRamo" value="bares"></label>
+      <div style="margin-left:auto;align-self:flex-end;display:flex;gap:8px"><button class="btn" onclick="csvRaio()">⇩ Empresas do raio</button><button class="btn pri" onclick="copiar(rzResumo,this)">Copiar resumo</button></div>
+    </div></div>
+    <div class="grid" style="grid-template-columns:1.25fr 1fr">
+      <div class="card"><div class="map" id="mapRaio" style="height:560px"></div><div class="cap">● empresas · <span style="color:#fb7185">●</span> atividade buscada · <span style="color:#f2a516">●</span> quem faz evento · <span style="color:#ef4444">●</span> concorrente · clique no mapa para mudar o local</div></div>
+      <div><div class="grid g2" id="rzK"></div><div class="card" style="margin-top:14px"><h3>Resumo do local</h3><div id="rzTxt" class="small" style="line-height:1.6"></div></div></div>
+    </div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card"><h2>Quem mora no raio (Censo 2022)</h2><canvas id="chRzIdade" height="200"></canvas></div>
+      <div class="card"><h2>O que existe em volta</h2><div id="rzAtiv"></div></div>
+    </div>
+  </section>
+
+  <section class="page" id="p-publico">
+    <h1>Público por bairro</h1><p class="sub">Onde mora quem bebe cerveja artesanal: escolha uma persona ou ajuste os pesos e o radar ranqueia os bairros de Uberlândia (Censo 2022 por setor).</p>
+    <div class="chips" id="persona"></div>
+    <div class="card" style="margin-bottom:14px"><div class="bar" style="margin:0;gap:20px">
+      <label class="rng">Renda <b id="vR"></b><input type="range" id="wR" min="0" max="5" value="4"></label>
+      <label class="rng">Jovens 15–24 <b id="vJ"></b><input type="range" id="wJ" min="0" max="5" value="1"></label>
+      <label class="rng">Adultos 25–39 <b id="vA"></b><input type="range" id="wA" min="0" max="5" value="5"></label>
+      <label class="rng">40–59 <b id="vM"></b><input type="range" id="wM" min="0" max="5" value="1"></label>
+      <label class="rng">60+ <b id="vS"></b><input type="range" id="wS" min="0" max="5" value="0"></label>
+      <label class="rng">Mora sozinho <b id="vO"></b><input type="range" id="wO" min="0" max="5" value="2"></label>
+      <label class="rng">Apartamento <b id="vP"></b><input type="range" id="wP" min="0" max="5" value="2"></label>
+      <label class="rng">Tamanho <b id="vT"></b><input type="range" id="wT" min="0" max="5" value="2"></label>
+    </div></div>
+    <div class="grid g2">
+      <div class="card"><h2>Bairros que mais combinam</h2><div class="tw" style="max-height:560px"><table><thead><tr><th>#</th><th>Bairro</th><th>Fit</th><th>Pessoas</th><th>Renda resp.</th><th>25–39</th><th>Apto</th><th>Bares</th></tr></thead><tbody id="tPub"></tbody></table></div><div style="margin-top:10px"><button class="btn" onclick="csvPub()">⇩ Baixar ranking</button></div></div>
+      <div class="card"><h2>Onde estão</h2><div class="map" id="mapPub" style="height:560px"></div><div class="cap">Círculo = moradores · cor = aderência ao público (verde = maior).</div></div>
+    </div>
+  </section>
+
+  <section class="page" id="p-consumo">
+    <h1>Consumo e calendário</h1><p class="sub">Quanto dinheiro gira em Uberlândia comparado ao Triângulo e a outras cidades de Minas, e em que meses o comércio mais vende — Pix por município, Banco Central.</p>
+    <div class="grid g4" id="pxK"></div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card"><h2>Quando vender mais — sazonalidade do comércio</h2><canvas id="chSaz" height="230"></canvas><div class="cap" id="sazTxt"></div></div>
+      <div class="card"><h2>Pix recebido pelo comércio — 24 meses</h2><canvas id="chPx" height="230"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Uberlândia × Minas Gerais</h2><div class="tw"><table><thead><tr><th>Cidade</th><th>População</th><th>Pix das pessoas (12m)</th><th>Por habitante</th><th>Cresc.</th><th>Comércio recebeu (12m)</th><th>Cresc.</th></tr></thead><tbody id="tPx"></tbody></table></div></div>
+  </section>
+
+  <section class="page" id="p-cidade">
+    <h1>Economia e mídia local</h1><p class="sub">O tamanho da economia de Uberlândia, a qualidade de vida comparada às maiores cidades de Minas e as rádios e TVs com outorga na cidade — tudo de fonte pública: IBGE, IPS Brasil e Ministério das Comunicações.</p>
+    <div class="grid g4" id="cdK"></div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card"><h2>PIB de Uberlândia, 2019–2023</h2><canvas id="chPib" height="230"></canvas><div class="cap">IBGE, PIB dos Municípios (tabela 5938), a preços correntes.</div></div>
+      <div class="card"><h2>De onde vem a riqueza (2021)</h2><canvas id="chVab" height="230"></canvas><div class="cap">Valor adicionado por setor — último ano com a abertura publicada pelo IBGE.</div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Uberlândia × Minas Gerais</h2><div class="tw"><table><thead><tr><th>Cidade</th><th>População 2025</th><th>PIB 2023</th><th>PIB por habitante</th><th>Cresc. PIB 2019–23</th><th>IPS 2026</th><th>Posição em MG</th></tr></thead><tbody id="tCid"></tbody></table></div></div>
+    <div class="grid g2" style="margin-top:14px">
+      <div class="card"><h2>Qualidade de vida — os 12 componentes do IPS</h2><div id="ipsComp"></div><div class="cap">Barra = Uberlândia · traço = média das outras 7 cidades. Escala 0–100.</div></div>
+      <div class="card"><h2>O que importa para cerveja e evento</h2><div id="ipsSel"></div><div class="cap" id="ipsCap"></div></div>
+    </div>
+    <div class="card" style="margin-top:14px"><h2>Rádios e TVs com outorga em Uberlândia</h2>
+      <div class="bar"><select id="emT"><option value="">Todas</option><option value="FM">Rádio FM</option><option value="TV">TV</option></select><label class="ck"><input type="checkbox" id="emLic" checked> só licenciadas (no ar)</label><span class="muted small" id="emN"></span><button class="btn" style="margin-left:auto" onclick="csvEm()">⇩ Baixar</button></div>
+      <div class="tw" style="max-height:520px"><table><thead><tr><th>Tipo</th><th>Frequência</th><th>Emissora</th><th>Empresa titular</th><th>Situação</th></tr></thead><tbody id="tEm"></tbody></table></div>
+      <div class="cap">Ministério das Comunicações / Anatel (dados abertos, domínio público, atualização diária). Audiência de rádio não é dado público — por isso não aparece aqui.</div></div>
+  </section>
+
+  <section class="page" id="p-univ">
+    <h1>Universitários em Uberlândia</h1><p class="sub">O público das festas universitárias, atléticas e formaturas: matrículas, ingressantes e concluintes por instituição e por curso, no Censo da Educação Superior do INEP. O presencial é quem está na cidade — o EaD aparece à parte.</p>
+    <div class="grid g4" id="unK"></div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>Instituições — matrícula presencial</h2><div class="tw" style="max-height:440px"><table><thead><tr><th>Instituição</th><th>Rede</th><th>Presencial</th><th>Ingressantes</th><th>Concluintes</th><th>EaD</th></tr></thead><tbody id="tUnI"></tbody></table></div></div>
+      <div class="card"><h2>Uberlândia × Minas — matrícula presencial</h2><canvas id="chUn" height="260"></canvas></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>Os maiores cursos presenciais</h2><div class="bar"><select id="unF"><option value="">Toda instituição</option></select><span class="muted small">Concluintes = turma de formatura do ano.</span><button class="btn" style="margin-left:auto" onclick="csvUn()">⇩ Baixar</button></div><div class="tw" style="max-height:520px"><table><thead><tr><th>Curso</th><th>Instituição</th><th>Turno</th><th>Área</th><th>Matrículas</th><th>Ingressantes</th><th>Concluintes</th></tr></thead><tbody id="tUnC"></tbody></table></div></div>
+  </section>
+
+  <section class="page" id="p-clima">
+    <h1>Clima e sazonalidade</h1><p class="sub">Calor puxa chopp; chuva derruba evento ao ar livre. Média de 2021 a 2025 da estação automática do INMET em Uberlândia, ao lado do interesse de busca por «chopp» em Minas mês a mês.</p>
+    <div class="grid g4" id="clK"></div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card"><h2>Temperatura e chuva, mês a mês</h2><canvas id="chCl" height="240"></canvas><div class="cap" id="clCap"></div></div>
+      <div class="card"><h2>Calor × interesse por chopp</h2><canvas id="chClT" height="240"></canvas><div class="cap">Barras: dias com máxima ≥ 30 °C (INMET). Linha: índice médio de busca por «chopp» em MG no mês (Google Trends, 5 anos).</div></div>
+    </div>
+    <div class="card" style="margin-top:16px"><h2>A régua do ano</h2><div class="tw"><table><thead><tr><th>Mês</th><th>Temp. média</th><th>Máxima média</th><th>Dias ≥ 30 °C</th><th>Chuva</th><th>Dias de chuva</th><th>Busca «chopp»</th><th>Leitura</th></tr></thead><tbody id="tCl"></tbody></table></div></div>
+  </section>
+
+  <section class="page" id="p-bases">
+    <h1>Bases de dados</h1><p class="sub">Tudo aberto e auditável; só o Google Maps é pago. Cada lista diz de onde veio.</p>
+    <div class="grid g2" id="lBases"></div>
+  </section>
+</main>
+</div>
+<div class="veil" id="veil"></div>
+<aside class="drawer" id="drawer"><div class="dhead" id="dhead"></div><div class="dbody" id="dbody"></div></aside>
+
+<div id="trava"><form id="trava-form" autocomplete="on">
+<div class="logo" style="width:40px;height:40px;font-size:20px">U</div><h1>Radar Uberbrau</h1>
+<p class="small muted" style="margin:0">Acesso restrito. Entre com o usuário e a senha que você recebeu.</p>
+<label>usuário<input id="trava-u" name="username" autocomplete="username" required></label>
+<label>senha<input id="trava-s" name="password" type="password" autocomplete="current-password" required></label>
+<button type="submit" class="btn pri">Entrar</button><p id="trava-msg" role="status"></p></form></div>
+<style>#trava{position:fixed;inset:0;z-index:10000;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:16px}
+#trava form{width:min(360px,100%);display:flex;flex-direction:column;gap:12px}#trava h1{font-size:24px;margin:0}
+#trava label{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--tx2)}
+#trava input{font:inherit;font-size:15px;padding:0 12px;height:44px;background:var(--bg2);color:var(--tx);border:0;border-bottom:1px solid var(--line2)}
+#trava input:focus{outline:2px solid var(--ac);outline-offset:-2px}#trava .btn{justify-content:flex-start}#trava-msg{min-height:1.2em;font-size:13px;color:var(--tx2)}</style>
+<script type="application/json" id="cofre">{"iter":310000,"versao":"d26c155669b4","usuarios":{"0cb1a05a7201e2d200fefa9178c71bd449b72ab11cfe68098c85cb9dacfa1d61":{"s":"aS5fNLMg9NDvfievfUKeew==","iv":"AB/7caA2MKWwd2dE","c":"K2HRC+tmtsi407zqDexC7wKO0OQ+zcoGUgkGNiAG0x+7jU0cSIpxC8NYCS64zq0C","validade":null},"91b78b745c3938679701c4b3c2b03752936ecbfe51753abe812015d44252fda7":{"s":"krY1K5ofKritylg/hdhEHQ==","iv":"k2QxFJpxsPu+KmcU","c":"NLDfA6326j9DvJP6iUy4lvHvNl3H15ruNxbRAwoO6oJ6BEr5Qpc9/SR8keyJEtZ5","validade":null},"214a125e82cf9226954f3f7f9493a89951b6fc66bcbbdaf8f420550ab5938a4f":{"s":"rDRzN/Xe0GUkMODwK7qRfA==","iv":"BbNP52m8e40JoQO2","c":"2WL2FUiE1zLwgowWLSbOAMCPt7l0W8u5FelCXqZGT9LEVY3k5PII+ycU2DXVav/U","validade":null},"c6a19fa92343ed316c7babc92d04fb8c08db51132b2e74f70262eec5e07a6905":{"s":"oIr9vN2jK6gq6drAsVw9wQ==","iv":"ays06AD1YYsCRDZJ","c":"pTiUk26XbS0gJdLP90vSmBQuIMINxR4sf6q9WAuvCx7dmHbyVxm4Lofob6dxs7VG","validade":null}}}</script>
+<script type="text/plain" id="app-js">const R=window.__R;window.__R=null;
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const nf=new Intl.NumberFormat("pt-BR");const fmt=n=>n==null||n===""||isNaN(n)?"—":nf.format(Math.round(n));
+const brl=n=>{if(n==null||isNaN(n))return"—";n=+n;const a=Math.abs(n),o={maximumFractionDigits:1};if(a>=1e9)return"R$ "+(n/1e9).toLocaleString("pt-BR",o)+" bi";if(a>=1e6)return"R$ "+(n/1e6).toLocaleString("pt-BR",o)+" mi";if(a>=1e4)return"R$ "+(n/1e3).toLocaleString("pt-BR",o)+" mil";return"R$ "+fmt(n)};
+const pct=n=>n==null||isNaN(n)?"—":(+n).toLocaleString("pt-BR",{maximumFractionDigits:1})+"%";
+const nrm=s=>String(s??"").normalize("NFD").replace(/[̀-ͯ]/g,"").toLowerCase();
+const css=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const PAL=["#0f62fe","#8a3ffc","#009d9a","#ee5396","#198038","#fa4d56","#1192e8","#b28600","#6929c4","#002d9c"];/* categórica do IBM Carbon */
+const charts={};
+function chart(id,cfg){if(charts[id])charts[id].destroy();Chart.defaults.color=css("--tx2");Chart.defaults.borderColor=css("--line");Chart.defaults.font.family="IBM Plex Sans";const cv=document.getElementById(id);if(!cv.parentElement.classList.contains("chw")){const w=document.createElement("div");w.className="chw";w.style.cssText=`position:relative;height:${cv.getAttribute("height")||220}px`;cv.parentElement.insertBefore(w,cv);w.appendChild(cv)}cfg.options=Object.assign({maintainAspectRatio:false},cfg.options||{});charts[id]=new Chart(cv,cfg)}
+function download(nome,linhas){const t=linhas.map(r=>r.map(v=>{v=String(v??"");return/[;"\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v}).join(";")).join("\n");const b=new Blob(["﻿"+t],{type:"text/csv;charset=utf-8"});const a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=nome;document.body.appendChild(a);a.click();a.remove()}
+function copiar(t,b){navigator.clipboard&&navigator.clipboard.writeText(t);const o=b.textContent;b.textContent="✓ Copiado";setTimeout(()=>b.textContent=o,1500)}
+const ROT=R.rotulo,GRP=R.grupo,ABORD=R.abordagem,A=R.alvos;
+A.forEach((a,i)=>{a.i=i;a.k=nrm(a.nome+" "+a.rz+" "+a.bairro+" "+a.socios.map(s=>s.nome).join(" "))});
+const SEGCOR={organizador:"#f2a516",associacao:"#fb7185",bufe:"#4ade80",producao_artistica:"#c084fc",estrutura_locacao:"#60a5fa",clube:"#22d3ee",foto_filmagem:"#a3e635",casa_de_eventos:"#94a3b8",bar_noite:"#f97316",restaurante:"#ffcf5a",adega_bebidas:"#fb923c",hotel:"#38bdf8",distribuidor_bebidas:"#f87171",cervejaria:"#ef4444"};
+const scoreCor=s=>s>=14?"#16a34a":s>=11?"#f2a516":s>=8?"#b45309":"#78716c";
+const E=R.emp.cols,NE=R.emp.total,CN=R.cnaes,cnN=CN.map(c=>nrm(c[1]));
+const RAD=Math.PI/180;const dist=(a,b,c,d)=>{const x=(d-b)*RAD*Math.cos((a+c)/2*RAD),y=(c-a)*RAD;return Math.sqrt(x*x+y*y)*6371000};
+const telHTML=a=>[...a.cel.map(t=>`<a class="wa" href="https://wa.me/55${t.replace(/\D/g,"")}" target="_blank" title="abrir no WhatsApp">${esc(t)} ⓦ</a>`),...a.tel.filter(t=>!a.cel.includes(t)).map(t=>`<span>${esc(t)}</span>`)].join("<br>");
+
+const TM={organizador:"Organizador / produtora",cerimonial:"Cerimonial",formatura:"Formatura",bufe:"Bufê",estrutura:"Som, luz e estrutura",associacao:"Atlética / associação",espaco:"Espaço de eventos",pdv:"Bar, adega e PDV",concorrente_cervejaria:"Cervejaria",concorrente_chopp:"Chopp — distribuidora, delivery, chopperia",concorrente_distribuidora:"Distribuidora de bebidas",uberbrau:"Uberbrau"};
+const TC={organizador:"#f2a516",cerimonial:"#fb7185",formatura:"#c084fc",bufe:"#4ade80",estrutura:"#60a5fa",associacao:"#f472b6",espaco:"#94a3b8",pdv:"#f97316",concorrente_cervejaria:"#ef4444",concorrente_chopp:"#dc2626",concorrente_distribuidora:"#fca5a5",uberbrau:"#ffcf5a"};
+const LG=R.lugares;LG.forEach((p,i)=>{p.i=i;p.k=nrm([p.n,p.c,p.bai,p.end].join(" "))});
+const EVT=["organizador","cerimonial","formatura","bufe","estrutura","associacao","espaco"];
+const telLink=t=>{const d=String(t||"").replace(/\D/g,"").replace(/^55/,"");return d.length===11&&d[2]==="9"?`<a class="wa" href="https://wa.me/55${d}" target="_blank" title="abrir no WhatsApp">${esc(t)} ⓦ</a>`:esc(t||"")};
+const estrela=p=>p.nota?`<b>${String(p.nota).replace(".",",")}</b> ★ <span class="muted">(${fmt(p.av)})</span>`:'<span class="muted">—</span>';
+const popL=p=>`<b>${esc(p.n)}</b><br><span class="tagc">${esc(TM[p.t]||p.t)}</span> ${esc(p.c||"")}<br>${estrela(p)}<br>${esc(p.end||"")}${p.tel?"<br>"+telLink(p.tel):""}<br>${p.ig?`<a href="${esc(p.ig)}" target="_blank">Instagram</a> · `:""}${p.site?`<a href="${esc(p.site)}" target="_blank">site</a> · `:""}${p.url?`<a href="${esc(p.url)}" target="_blank">Google Maps</a>`:""}${p.a!=null?`<br><a href="javascript:void 0" onclick="ficha(${p.a})">ficha da Receita →</a>`:""}`;
+/* concorrência única: Google Maps + Receita (sem repetir quem casou) */
+const CONC=(()=>{const L_=LG.filter(p=>p.t.startsWith("concorrente_")).map(p=>({n:p.n,t:p.t,c:p.c,nota:p.nota,av:p.av,tel:p.tel,site:p.site,ig:p.ig,end:p.end,bai:p.bai,la:p.la,lo:p.lo,url:p.url,a:p.a,anos:p.a!=null?A[p.a].anos:null,fonte:p.a!=null?"Google + Receita":"Google Maps"}));
+  const ja=new Set(L_.filter(c=>c.a!=null).map(c=>c.a));
+  A.filter(a=>a.grupo==="concorrencia"&&!ja.has(a.i)).forEach(a=>L_.push({n:a.nome,t:a.segp==="cervejaria"?"concorrente_cervejaria":"concorrente_distribuidora",c:a.cnae.split(" — ")[1],nota:null,av:0,tel:a.cel[0]||a.tel[0],site:a.maps?.site,ig:a.maps?.ig,end:a.end,bai:a.bairro,la:a.lat,lo:a.lon,url:a.maps?.url,a:a.i,anos:a.anos,fonte:"Receita"}));
+  L_.forEach(c=>c.k=nrm([c.n,c.bai,c.end,c.c].join(" ")));return L_.sort((x,y)=>(y.av||0)-(x.av||0))})();
+const PROPRIOS=LG.filter(p=>p.t==="uberbrau");
+const SP=R.espaco||{},CP=(R.corp&&R.corp.empresas)||[],ES=R.espacos||[];
+CP.forEach((c,i)=>{c.i=i;c.k=nrm([c.nome,c.rz,c.bairro,c.setor,c.socios.map(s=>s.nome).join(" ")].join(" "))});
+ES.forEach((e,i)=>{e.i=i;e.k=nrm([e.n,e.bai,e.c,e.cls].join(" "))});
+const km=v=>v==null?"—":String(v).replace(".",",")+" km";
+function estudarAqui(la,lo){const j=init.raio;RZ={lat:la,lon:lo};ir("raio");if(j)renderRaio(true)}
+
+/* nav */
+const init={},RENDER={},MAPS={};
+function ir(p){$$("nav button").forEach(b=>b.classList.toggle("on",b.dataset.p===p));$$(".page").forEach(s=>s.classList.toggle("on",s.id==="p-"+p));$("#main").scrollTop=0;if(!init[p]&&RENDER[p]){init[p]=1;RENDER[p]()}setTimeout(()=>Object.values(MAPS).forEach(m=>m.invalidateSize()),80);history.replaceState(null,"","#"+p)}
+$$("nav button").forEach(b=>b.onclick=()=>ir(b.dataset.p));
+L.CircleMarker.mergeOptions({bubblingMouseEvents:false});
+const escuro=()=>{const t=document.documentElement.dataset.theme;return t?t==="dark":matchMedia("(prefers-color-scheme: dark)").matches};
+const tiles=()=>`https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/${escuro()?"World_Dark_Gray_Base":"World_Light_Gray_Base"}/MapServer/tile/{z}/{y}/{x}`;
+function mapa(id,c=[-18.915,-48.275],z=12){if(MAPS[id])return MAPS[id];const m=L.map(id,{preferCanvas:true}).setView(c,z);m._tl=L.tileLayer(tiles(),{attribution:"Esri, HERE, Garmin, © OpenStreetMap",maxZoom:16}).addTo(m);MAPS[id]=m;return m}
+$("#tema").onclick=()=>{const r=document.documentElement;r.dataset.theme=escuro()?"light":"dark";Object.values(MAPS).forEach(m=>m._tl.setUrl(tiles()));Object.values(charts).forEach(c=>c.update())};
+$("#foot").innerHTML=`Atualizado em ${esc(R.meta.gerado)}<br>${fmt(NE)} empresas ativas mapeadas`;
+
+/* abrir ficha */
+function ficha(i){const a=A[i];
+  $("#dhead").innerHTML=`<button class="btn x" onclick="fechar()">✕</button><div style="display:flex;gap:12px;align-items:center;padding-right:50px"><span class="score" style="background:${scoreCor(a.score)};width:44px;height:44px;font-size:17px">${a.score}</span><div><h1 style="font-size:21px">${esc(a.nome)}</h1><div class="small muted">${esc(ROT[a.segp]||"")} · ${esc(a.bairro)} · ${a.mei?"MEI":esc(a.porte)}${a.anos!=null?" · "+a.anos+" anos":""}</div></div></div>`;
+  $("#dbody").innerHTML=`${ABORD[a.segp]?`<div class="card" style="border-color:var(--ac);margin-bottom:14px"><h3>💬 Abordagem sugerida</h3><div class="quote">${esc(ABORD[a.segp])}</div><button class="btn" style="margin-top:10px" onclick="copiar(ABORD['${a.segp}'],this)">Copiar mensagem</button></div>`:""}
+  <h3>Quem responde pela empresa</h3>${a.socios.length?a.socios.map(s=>`<div class="news" style="padding:7px 0"><div class="av" style="width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-weight:700;color:var(--tx2);flex:none">${esc(s.nome.split(" ").map(x=>x[0]).slice(0,2).join(""))}</div><div><b>${esc(s.nome)}</b><div class="small muted">${esc(s.qual||"")}</div></div></div>`).join(""):'<div class="small muted">Empresa individual (MEI/EI) — o titular é o próprio nome da razão social.</div>'}
+  <h3 style="margin-top:16px">Contato registrado</h3><dl class="kv"><dt>Telefone</dt><dd>${telHTML(a)||"—"}</dd><dt>E-mail</dt><dd>${a.email?`<a href="mailto:${esc(a.email)}">${esc(a.email)}</a>`:"—"}</dd><dt>Endereço</dt><dd>${esc(a.end)} · ${esc(a.bairro)} · CEP ${esc(a.cep)}</dd></dl>
+  ${a.maps?`<h3 style="margin-top:16px">No Google Maps</h3><dl class="kv"><dt>Avaliação</dt><dd>${a.maps.nota??"—"} ★ (${fmt(a.maps.av)} avaliações)</dd><dt>Site</dt><dd>${a.maps.site?`<a href="${esc(a.maps.site)}" target="_blank">${esc(a.maps.site)}</a>`:"—"}</dd><dt>Instagram</dt><dd>${a.maps.ig?`<a href="${esc(a.maps.ig)}" target="_blank">${esc(a.maps.ig)}</a>`:"—"}</dd></dl>`:""}
+  <h3 style="margin-top:16px">Cadastro</h3><dl class="kv"><dt>Razão social</dt><dd>${esc(a.rz)}</dd><dt>CNPJ</dt><dd>${esc(a.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,"$1.$2.$3/$4-$5"))}</dd><dt>Atividade</dt><dd>${esc(a.cnae)}</dd><dt>Também faz</dt><dd>${a.sec.map(s=>`<div class="small">• ${esc(s)}</div>`).join("")||"—"}</dd><dt>Tipos no radar</dt><dd>${a.segs.map(s=>`<span class="tagc">${esc(ROT[s])}</span>`).join("")}</dd></dl>
+  <div class="cap">Nota de prioridade: tipo de parceiro, atividade principal, celular, e-mail, presença no Google e tempo de casa.</div>`;
+  $("#drawer").classList.add("on");$("#veil").classList.add("on")}
+function fechar(){$("#drawer").classList.remove("on");$("#veil").classList.remove("on")}
+$("#veil").onclick=fechar;document.addEventListener("keydown",e=>{if(e.key==="Escape")fechar()});
+
+/* busca */
+$("#q").oninput=()=>{const q=nrm($("#q").value.trim()),box=$("#sres");if(q.length<2){box.style.display="none";return}const ws=q.split(/\s+/);
+  const r=A.filter(a=>ws.every(w=>a.k.includes(w))).slice(0,20).map(a=>({t:a.nome,s:ROT[a.segp]+" · "+a.bairro,tag:"Empresa",go:()=>ficha(a.i)}));
+  CP.filter(c=>ws.every(w=>c.k.includes(w))).slice(0,10).forEach(c=>r.push({t:c.nome,s:c.setor+" · "+c.bairro,tag:"Corporativo",go:()=>fichaCorp(c.i)}));
+  LG.filter(p=>p.a==null&&ws.every(w=>p.k.includes(w))).slice(0,10).forEach(p=>r.push({t:p.n,s:(TM[p.t]||p.t)+(p.bai?" · "+p.bai:""),tag:"Maps",go:()=>{ir("mapa");MAPS.mapa.setView([p.la,p.lo],16);L.popup().setLatLng([p.la,p.lo]).setContent(popL(p)).openOn(MAPS.mapa)}}));
+  R.bairros.filter(b=>ws.every(w=>nrm(b.nome).includes(w))).slice(0,5).forEach(b=>r.push({t:b.nome,s:fmt(b.pessoas)+" moradores",tag:"Bairro",go:()=>{ir("raio");RZ={lat:b.lat,lon:b.lon};renderRaio(true)}}));
+  box.innerHTML=r.map((x,i)=>`<div class="it" data-i="${i}"><span class="pill">${x.tag}</span><div><div>${esc(x.t)}</div><div class="small muted">${esc(x.s)}</div></div></div>`).join("")||'<div class="empty">Nada encontrado</div>';box.style.display="block";$$("#sres .it").forEach(e=>e.onclick=()=>{r[+e.dataset.i].go();box.style.display="none"})};
+document.addEventListener("click",e=>{if(!e.target.closest(".search"))$("#sres").style.display="none"});
+
+/* VISÃO */
+RENDER.inicio=()=>{const ev=A.filter(a=>a.grupo==="evento"&&a.segp!=="casa_de_eventos"),pdv=A.filter(a=>a.grupo==="pdv");
+  const pop=R.bairros.reduce((s,b)=>s+b.pessoas,0),U=SP.unidades||{},un=k=>Object.entries(U).find(([n])=>n.startsWith(k))?.[1];
+  const eU=un("Espaço"),bU=un("Bar"),cpP=CP.filter(c=>!c.publico),cpL=cpP.filter(c=>c.local),esB=ES.filter(e=>e.beb_crit);
+  const fr=[["Espaço Überbräu",`Eventos corporativos, sociais e culturais · até ${SP.capacidade||"—"} pessoas · ${esc(SP.end||"")}`,eU?`${String(eU.nota).replace(".",",")} ★ · ${fmt(eU.av)} avaliações no Google`:"",`${fmt(cpP.length)} empresas com porte para evento corporativo · ${fmt(ES.length)} espaços concorrentes`,"corp"],
+    ["Chopp para eventos","Barril de 15 a 50 litros, direto da fábrica, no local que o cliente escolher","",`${fmt(ev.length)} produtoras, bufês, formaturas e cerimoniais · ${fmt(CONC.length)} concorrentes no chopp`,"eventos"],
+    ["Bar no Mercado Municipal","Chopp artesanal e almoço de terça a domingo, no Centro",bU?`${String(bU.nota).replace(".",",")} ★ · ${fmt(bU.av)} avaliações no Google`:"",`${fmt(pdv.length)} bares, adegas, restaurantes e hotéis na cidade`,"pdv"]];
+  $("#frentes").innerHTML=fr.map(([t,d,g,n,p],i)=>`<div class="card kpi" style="--kc:${i?PAL[i]:"var(--marca)"};cursor:pointer" onclick="ir('${p}')"><div class="l" style="font-weight:600;color:var(--tx)">${i+1}. ${t}</div><div class="small" style="margin-top:6px">${d}</div>${g?`<div class="small muted" style="margin-top:6px">${g}</div>`:""}<div class="s">${n} →</div></div>`).join("");
+  const conv=ES.filter(e=>e.cls==="Corporativo e convenções").sort((a,b)=>(b.av||0)-(a.av||0))[0];
+  const UO=OP?OP.lugares.filter(l=>l.tipo==="uberbrau"):[],am=UO.reduce((s,l)=>s+l.amostra,0),rp=UO.reduce((s,l)=>s+l.respondidos,0);
+  const ach=[];
+  if(eU&&bU)ach.push([`O Espaço tem <b>${fmt(eU.av)} avaliações</b> no Google; o bar da mesma marca tem ${fmt(bU.av)}${conv?` e o ${esc(conv.n)}, a ${km(conv.km)} dali, ${fmt(conv.av)}`:""}. Quem procura onde fazer evento compara pelo Google — a vitrine do Espaço é a mais fraca das três frentes.`,"espacos"]);
+  if(esB.length)ach.push([`<b>${fmt(esB.reduce((s,e)=>s+e.beb_crit,0))} críticas à bebida</b> em ${esB.length} espaços concorrentes (${esc(esB.slice(0,3).map(e=>e.n).join(", "))}…): demora e fila para pegar bebida, poucos garçons, bebida quente. O Espaço tem o chopp feito na própria casa.`,"espacos"]);
+  if(cpP.length)ach.push([`<b>${fmt(cpP.length)} empresas e entidades</b> com porte para evento corporativo em Uberlândia; <b>${fmt(cpL.length)}</b> têm a matriz na cidade (a decisão é local) e ${fmt(cpP.filter(c=>c.km!=null&&c.km<=5).length)} ficam a até 5 km do Espaço.`,"corp"]);
+  if(am)ach.push([`A Uberbrau respondeu <b>${rp} de ${am}</b> comentários lidos no Google. Para um espaço de eventos, responder é parte da venda: o próximo cliente lê.`,"opinioes"]);
+  if((SP.lacunas||[]).length)ach.push([`A página do Espaço no site: ${esc(SP.lacunas.map(x=>x.charAt(0).toLowerCase()+x.slice(1)).join("; "))}.`,"espacos"]);
+  $("#achados").innerHTML=`<ol style="margin:0;padding-left:20px;line-height:1.7">${ach.map(([t,p])=>`<li>${t} <a href="javascript:void 0" onclick="ir('${p}')">ver →</a></li>`).join("")}</ol>`;
+  const K=[["Empresas p/ evento corporativo",cpP.length,`${fmt(cpL.length)} com matriz em Uberlândia`,"corp"],["Espaços concorrentes",ES.length,`${ES.filter(e=>e.cls==="Corporativo e convenções").length} de convenções e eventos corporativos`,"espacos"],["Críticas à bebida nos espaços",esB.reduce((s,e)=>s+e.beb_crit,0),`em ${esB.length} espaços — Google Maps`,"espacos"],["Produtoras, bufês, formaturas",ev.length,`${ev.filter(a=>a.cel.length).length} com celular · quem traz o evento`,"eventos"],["Bares, adegas e PDV",pdv.length,"ponto de venda do dia a dia","pdv"],["Concorrentes no chopp",CONC.length,`${CONC.filter(c=>c.t==="concorrente_cervejaria").length} cervejarias · Google Maps + Receita`,"concorrencia"],["Moradores mapeados",pop,"Censo 2022, por setor","publico"],["Universitários presenciais",R.inep?.uberlandia?.presencial?.matriculas??null,"formaturas e festas de atlética","univ"]];
+  $("#kpis").innerHTML=K.map(([l,v,s,p],i)=>`<div class="card kpi" style="--kc:${PAL[i%PAL.length]};cursor:pointer" onclick="ir('${p}')"><div class="l">${l}</div><div class="v">${fmt(v)}</div><div class="s">${esc(s)}</div></div>`).join("");
+  const c={};A.forEach(a=>a.segs.forEach(s=>c[s]=(c[s]||0)+1));const ks=Object.keys(c).sort((a,b)=>c[b]-c[a]);
+  chart("chSeg",{type:"bar",data:{labels:ks.map(k=>ROT[k]),datasets:[{data:ks.map(k=>c[k]),backgroundColor:ks.map(k=>SEGCOR[k]),borderRadius:0}]},options:{indexAxis:"y",plugins:{legend:{display:false}}}});
+  $("#top10c").innerHTML=cpP.slice(0,10).map(x=>`<div class="news" style="cursor:pointer" onclick="fichaCorp(${x.i})"><span class="score" style="background:${scoreCor(x.score)}">${x.score}</span><div style="flex:1;min-width:0"><b>${esc(x.nome)}</b><div class="small muted">${esc(x.setor)} · ${esc(x.bairro)} · ${km(x.km)}</div></div>${x.local?'<span class="pill">matriz local</span>':""}</div>`).join("")||'<div class="empty">Rode coleta/rfb_corporativo.py</div>';
+  $("#top10").innerHTML=ev.slice(0,10).map(a=>`<div class="news" style="cursor:pointer" onclick="ficha(${a.i})"><span class="score" style="background:${scoreCor(a.score)}">${a.score}</span><div style="flex:1;min-width:0"><b>${esc(a.nome)}</b><div class="small muted">${esc(ROT[a.segp])} · ${esc(a.bairro)}${a.socios[0]?" · "+esc(a.socios[0].nome):""}</div></div>${a.cel.length?'<span class="pill" style="color:#4ade80">WhatsApp</span>':""}</div>`).join("")};
+
+/* ESPAÇO ÜBERBRÄU — QUEM CONTRATA EVENTO CORPORATIVO */
+let fSet="",corpLayer=null;
+const ESPLL=SP.lat?[SP.lat,SP.lon]:null;
+const marcaEspaco=m=>{if(!ESPLL)return;L.circleMarker(ESPLL,{radius:11,color:"#fff",fillColor:"#ffcf5a",fillOpacity:1,weight:2}).bindPopup(`<b>Espaço Überbräu</b><br>${esc(SP.end)} · até ${SP.capacidade} pessoas`).addTo(m)};
+RENDER.corp=()=>{if(!CP.length){$("#cpK").innerHTML='<div class="empty">Rode coleta/rfb_corporativo.py</div>';return}
+  const P=CP.filter(c=>!c.publico);
+  $("#cpK").innerHTML=[["Empresas e entidades",fmt(P.length),"porte, capital, cooperativa ou entidade de classe"],["Matriz em Uberlândia",fmt(P.filter(c=>c.local).length),"a decisão do evento é local"],["A até 5 km do Espaço",fmt(P.filter(c=>c.km!=null&&c.km<=5).length),"bairros vizinhos ao Tibery"],["Entidades de classe e sindicatos",fmt(P.filter(c=>c.setor==="Entidades de classe e sindicatos").length),"assembleia, posse e congresso todo ano"]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${PAL[i]}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+  const cont={};P.forEach(c=>cont[c.setor]=(cont[c.setor]||0)+1);
+  $("#fSet").innerHTML=[["","Todos"],...R.corp.setores.filter(k=>cont[k]).sort((a,b)=>cont[b]-cont[a]).map(k=>[k,k+" · "+cont[k]])].map(([k,l])=>`<button class="chip${k===fSet?" on":""}" data-k="${esc(k)}">${esc(l)}</button>`).join("");
+  $$("#fSet .chip").forEach(b=>b.onclick=()=>{fSet=b.dataset.k;$$("#fSet .chip").forEach(x=>x.classList.toggle("on",x===b));renderCorp()});
+  ["#cpQ","#cpLoc","#cpKm","#cpPub","#cpCel"].forEach(x=>$(x).oninput=renderCorp);
+  $("#cpCap").textContent=`${R.corp.fonte}. Critério: ${R.corp.criterio}. Contato = o que a empresa registrou na Receita (dado público), para contato comercial B2B com opção de descadastro (LGPD). Grandes empresas costumam decidir evento no RH, no marketing ou na diretoria — o administrador da Receita é a porta, não necessariamente quem compra.`;
+  renderCorp()};
+function filtraCorp(){const q=nrm($("#cpQ").value.trim()),loc=$("#cpLoc").value,k=+$("#cpKm").value||0,pub=$("#cpPub").checked,cel=$("#cpCel").checked;
+  return CP.filter(c=>(pub||!c.publico)&&(!fSet||c.setor===fSet)&&(!loc||(loc==="1"?c.local:!c.local))&&(!k||(c.km!=null&&c.km<=k))&&(!cel||c.cel.length)&&(!q||q.split(/\s+/).every(w=>c.k.includes(w))))}
+function renderCorp(){const L_=filtraCorp();$("#cpN").textContent=fmt(L_.length)+" empresas";
+  $("#tCorp").innerHTML=L_.slice(0,400).map(c=>`<tr class="cl" onclick="fichaCorp(${c.i})"><td><span class="score" style="background:${scoreCor(c.score)}">${c.score}</span></td><td><b>${esc(c.nome)}</b><div class="small muted">${esc(c.rz!==c.nome?c.rz:"")}</div></td><td class="small">${esc(c.setor)}</td><td class="small">${esc(c.porte||"—")}<div class="muted">${c.capital?brl(c.capital):""}</div></td><td class="small">${c.local?"Uberlândia":esc(c.matriz)}<div class="muted">${c.un_udi>1?c.un_udi+" unidades na cidade":""}</div></td><td class="small" onclick="event.stopPropagation()">${c.cel.map(telLink).join("<br>")||esc(c.tel[0]||"—")}${c.email[0]?`<br><a href="mailto:${esc(c.email[0])}">${esc(c.email[0])}</a>`:""}</td><td class="small">${km(c.km)}<div class="muted">${esc(c.bairro)}</div></td></tr>`).join("")+(L_.length>400?`<tr><td colspan=7 class="empty">Mostrando 400 de ${fmt(L_.length)} — a lista baixada traz todas.</td></tr>`:"")||`<tr><td colspan=7 class="empty">Nada neste filtro</td></tr>`;
+  const m=mapa("mapCorp",ESPLL||undefined,12);if(corpLayer)corpLayer.remove();corpLayer=L.layerGroup().addTo(m);
+  if(ESPLL)[5000,10000].forEach(r=>L.circle(ESPLL,{radius:r,color:"#f2a516",weight:1,fill:false,dashArray:"4 4"}).addTo(corpLayer));
+  L_.slice(0,3000).forEach(c=>{if(c.lat)L.circleMarker([c.lat,c.lon],{radius:3+Math.min(8,Math.sqrt(c.un_udi)*1.5),color:scoreCor(c.score),fillColor:scoreCor(c.score),fillOpacity:.7,weight:0}).bindPopup(`<b>${esc(c.nome)}</b><br>${esc(c.setor)} · ${km(c.km)}<br><a href="javascript:void 0" onclick="fichaCorp(${c.i})">abrir ficha</a>`).addTo(corpLayer)});
+  marcaEspaco(corpLayer)}
+function fichaCorp(i){const c=CP[i],ab=R.corp.abord[c.setor]||R.corp.abord["Outros"];
+  $("#dhead").innerHTML=`<button class="btn x" onclick="fechar()">✕</button><div style="display:flex;gap:12px;align-items:center;padding-right:50px"><span class="score" style="background:${scoreCor(c.score)};width:44px;height:44px;font-size:17px">${c.score}</span><div><h1 style="font-size:21px">${esc(c.nome)}</h1><div class="small muted">${esc(c.setor)} · ${esc(c.bairro)} · ${km(c.km)} do Espaço${c.local?" · matriz em Uberlândia":" · filial — matriz em "+esc(c.matriz)}</div></div></div>`;
+  $("#dbody").innerHTML=`<div class="card" style="margin-bottom:14px"><h3>💬 Abordagem sugerida — Espaço Überbräu</h3><div class="quote">${esc(ab)}</div><button class="btn" style="margin-top:10px" onclick="copiar(R.corp.abord[CP[${i}].setor]||R.corp.abord['Outros'],this)">Copiar mensagem</button>
+    <div class="small muted" style="margin-top:10px">Evento típico do setor (hipótese, não informação da empresa): ${esc(R.corp.eventos[c.setor]||R.corp.eventos["Outros"])}.${c.publico?" Órgão público: a contratação passa por licitação ou dispensa.":""}${!c.local?" Filial: o orçamento de evento pode estar na matriz; a unidade local costuma decidir confraternização e treinamento da própria equipe.":""}</div></div>
+  <h3>Quem responde pela empresa</h3>${c.socios.length?c.socios.map(s=>`<div class="news" style="padding:7px 0"><div style="width:34px;height:34px;border-radius:50%;background:var(--card2);display:grid;place-items:center;font-weight:700;color:var(--tx2);flex:none">${esc(s.nome.split(" ").map(x=>x[0]).slice(0,2).join(""))}</div><div><b>${esc(s.nome)}</b><div class="small muted">${esc(s.qual||"")}</div></div></div>`).join(""):'<div class="small muted">A Receita não lista administrador pessoa física.</div>'}
+  <h3 style="margin-top:16px">Contato registrado</h3><dl class="kv"><dt>Telefone</dt><dd>${c.tel.map(telLink).join("<br>")||"—"}</dd><dt>E-mail</dt><dd>${c.email.map(e=>`<a href="mailto:${esc(e)}">${esc(e)}</a>`).join("<br>")||"—"}</dd><dt>Endereço</dt><dd>${esc(c.end)} · ${esc(c.bairro)} · CEP ${esc(c.cep)}</dd></dl>
+  <h3 style="margin-top:16px">Cadastro</h3><dl class="kv"><dt>Razão social</dt><dd>${esc(c.rz)}</dd><dt>CNPJ</dt><dd>${esc(c.cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/,"$1.$2.$3/$4-$5"))}</dd><dt>Natureza</dt><dd>${esc(c.natureza)}</dd><dt>Porte</dt><dd>${esc(c.porte||"—")}</dd><dt>Capital social</dt><dd>${c.capital?brl(c.capital):"—"}</dd><dt>Matriz</dt><dd>${esc(c.matriz)}</dd><dt>Unidades</dt><dd>${fmt(c.un_udi)} em Uberlândia${c.un_br?" · "+fmt(c.un_br)+" no Brasil":""}</dd><dt>Atividade</dt><dd>${esc(c.cnae)}</dd><dt>Desde</dt><dd>${c.ini?esc(c.ini.slice(6,8)+"/"+c.ini.slice(4,6)+"/"+c.ini.slice(0,4)):"—"}</dd></dl>
+  <div class="cap">Nota de prioridade: porte, capital social, matriz em Uberlândia, unidades na cidade, setor que costuma fazer evento, distância até o Espaço e contato registrado. Capital social é o declarado no registro, não faturamento.</div>`;
+  $("#drawer").classList.add("on");$("#veil").classList.add("on")}
+function csvCorp(){download("uberbrau_evento_corporativo.csv",[["Nota","Empresa","Razão social","CNPJ","Setor","Evento típico do setor (hipótese)","Porte","Capital social","Natureza","Matriz","Unidades em Uberlândia","Unidades no Brasil","Administrador 1","Qualificação","Administrador 2","Celular (WhatsApp)","Telefones","E-mail","Endereço","Bairro","CEP","Distância do Espaço (km)","Atividade principal","Abordagem sugerida"],...filtraCorp().map(c=>[c.score,c.nome,c.rz,c.cnpj,c.setor,R.corp.eventos[c.setor],c.porte,c.capital,c.natureza,c.matriz,c.un_udi,c.un_br,c.socios[0]?.nome,c.socios[0]?.qual,c.socios[1]?.nome,c.cel.join(" / "),c.tel.join(" / "),c.email.join(" / "),c.end,c.bairro,c.cep,c.km,c.cnae,R.corp.abord[c.setor]||R.corp.abord["Outros"]])])}
+
+/* ESPAÇO ÜBERBRÄU — ESPAÇOS CONCORRENTES */
+let fCls="",espLayer=null;
+const CLSCOR={"Corporativo e convenções":"#0f62fe","Salão de festas e casamento":"#8a3ffc","Chácara e sítio":"#198038","Casa de show e balada":"#ee5396","Cultural":"#009d9a","Infantil":"#b28600"};
+RENDER.espacos=()=>{const U=SP.unidades||{},G=SP.google;
+  const conv=ES.filter(e=>e.cls==="Corporativo e convenções");
+  $("#esK").innerHTML=[["Espaços concorrentes",fmt(ES.length),"no Google Maps, em Uberlândia"],["Convenções e corporativo",fmt(conv.length),"a disputa direta do evento de empresa"],["A até 5 km do Espaço",fmt(ES.filter(e=>e.km!=null&&e.km<=5).length),"mesma região do Tibery"],["Com crítica à bebida",fmt(ES.filter(e=>e.beb_crit).length),`${fmt(ES.reduce((s,e)=>s+e.beb_crit,0))} comentários de 1–3 estrelas`]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${PAL[i]}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+  $("#esFicha").innerHTML=`<div class="grid g3" style="margin-bottom:12px">${[["Capacidade",SP.capacidade+" pessoas"],["Salão principal",SP.salao_m2+" m²"],["Pé-direito",SP.pe_direito]].map(([l,v])=>`<div><div class="small muted">${l}</div><div style="font-size:20px">${esc(v)}</div></div>`).join("")}</div>
+    <ul style="margin:0;padding-left:18px;line-height:1.6" class="small">${(SP.itens||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    <h3 style="margin-top:14px">O que falta na página</h3><ul style="margin:0;padding-left:18px;line-height:1.6" class="small">${(SP.lacunas||[]).map(x=>`<li>${esc(x)}</li>`).join("")}</ul>
+    <div class="cap">Fonte: <a href="${esc(SP.fonte)}" target="_blank">${esc(SP.fonte)}</a>, lida em ${esc(SP.lido_em)}.</div>`;
+  const rank=[...ES,{n:"Espaço Überbräu",av:(U[Object.keys(U).find(n=>n.startsWith("Espaço"))]||{}).av||0,eu:1}].sort((a,b)=>(b.av||0)-(a.av||0)),pos=rank.findIndex(x=>x.eu)+1;
+  const ct=G?G.comentarios.filter(c=>c.t):[];
+  $("#esVit").innerHTML=`<table><thead><tr><th>Unidade</th><th>Google</th><th>Categoria</th></tr></thead><tbody>${Object.entries(U).map(([n,u])=>`<tr><td><b>${esc(n)}</b></td><td>${u.nota?String(u.nota).replace(".",","):"—"} ★ <span class="muted">(${fmt(u.av)})</span></td><td class="small">${esc(u.cat||"")}</td></tr>`).join("")}</tbody></table>
+    <p class="small" style="margin-top:12px">Por número de avaliações, o Espaço fica em <b>${pos}º de ${rank.length}</b> entre os espaços de evento da cidade${conv[0]?` — o ${esc(conv.sort((a,b)=>(b.av||0)-(a.av||0))[0].n)} tem ${fmt(conv[0].av)}`:""}.${G?` O dono respondeu ${G.comentarios.filter(c=>c.r).length} de ${G.comentarios.length} avaliações.`:""}</p>
+    ${ct.map(c=>`<div class="news"><div style="min-width:80px"><div style="color:#f1c21b">${estr(c.n)}</div><div class="small muted mono">${esc((c.d||"").split("-").reverse().join("/"))}</div></div><div class="small">${esc(c.t)}</div></div>`).join("")}
+    <div class="cap">As críticas são de show com pagamento só por Pix — atendimento e informação, não estrutura.</div>`;
+  const cont={};ES.forEach(e=>cont[e.cls]=(cont[e.cls]||0)+1);
+  $("#fCls").innerHTML=[["","Todos · "+ES.length],...Object.keys(cont).sort((a,b)=>cont[b]-cont[a]).map(k=>[k,k+" · "+cont[k]])].map(([k,l])=>`<button class="chip${k===fCls?" on":""}" data-k="${esc(k)}">${esc(l)}</button>`).join("");
+  $$("#fCls .chip").forEach(b=>b.onclick=()=>{fCls=b.dataset.k;$$("#fCls .chip").forEach(x=>x.classList.toggle("on",x===b));renderEsp()});
+  ["#esQ","#esBev"].forEach(x=>$(x).oninput=renderEsp);
+  const cr=ES.flatMap(e=>e.crit.map(c=>[e,c])).sort((a,b)=>(b[1].d||"").localeCompare(a[1].d||""));
+  const hl=t=>esc(t).replace(/(chop+e?|bebida|cerveja|gelad[ao]|quente|open bar|garç[oa]m|garçons|demora)/gi,"<mark>$1</mark>");
+  $("#esCrit").innerHTML=cr.map(([e,c])=>`<div class="news"><div style="min-width:92px"><div style="color:#f1c21b">${estr(c.n)}</div><div class="small muted mono">${esc((c.d||"").split("-").reverse().join("/"))}</div></div><div style="flex:1;min-width:0"><div class="small" style="font-weight:600">${esc(e.n)} <span class="muted">· ${esc(e.cls)} · ${km(e.km)}</span></div><div>${hl(c.t)}</div></div></div>`).join("")||'<div class="empty">Sem comentário crítico sobre bebida na amostra.</div>';
+  renderEsp()};
+function filtraEsp(){const q=nrm($("#esQ").value.trim()),bv=$("#esBev").checked;return ES.filter(e=>(!fCls||e.cls===fCls)&&(!bv||e.beb_crit)&&(!q||q.split(/\s+/).every(w=>e.k.includes(w))))}
+function renderEsp(){const L_=filtraEsp();$("#esN").textContent=fmt(L_.length)+" espaços";
+  $("#tEsp").innerHTML=L_.map(e=>`<tr><td><b>${esc(e.n)}</b><div class="small muted">${esc(e.c||"")}</div></td><td><span class="tagc" style="border-color:${CLSCOR[e.cls]}">${esc(e.cls)}</span></td><td class="small">${estrela(e)}</td><td class="small">${e.beb?`${e.beb} falam da bebida${e.beb_crit?`<div style="color:var(--bad);font-weight:600">${e.beb_crit} críticas</div>`:""}`:'<span class="muted">—</span>'}</td><td class="small">${km(e.km)}<div class="muted">${esc(e.bai||"")}</div></td><td class="small">${e.tel?telLink(e.tel):""}${e.ig?`<br><a href="${esc(e.ig)}" target="_blank">Instagram</a>`:""}${e.site?`<br><a href="${esc(e.site)}" target="_blank">site</a>`:""}${e.url?`<br><a href="${esc(e.url)}" target="_blank">Maps</a>`:""}</td></tr>`).join("")||'<tr><td colspan=6 class="empty">Nada neste filtro</td></tr>';
+  const m=mapa("mapEsp",ESPLL||undefined,12);if(espLayer)espLayer.remove();espLayer=L.layerGroup().addTo(m);
+  L_.forEach(e=>L.circleMarker([e.la,e.lo],{radius:4+Math.sqrt(e.av||0)/5,color:e.beb_crit?"#da1e28":CLSCOR[e.cls],fillColor:e.beb_crit?"#da1e28":CLSCOR[e.cls],fillOpacity:.65,weight:1}).bindPopup(`<b>${esc(e.n)}</b><br>${esc(e.cls)} · ${km(e.km)}<br>${estrela(e)}${e.beb_crit?`<br><span style="color:#da1e28">${e.beb_crit} críticas à bebida</span>`:""}${e.url?`<br><a href="${esc(e.url)}" target="_blank">Google Maps</a>`:""}`).addTo(espLayer));
+  marcaEspaco(espLayer)}
+function csvEsp(){download("uberlandia_espacos_de_evento.csv",[["Espaço","Tipo","Categoria no Google","Nota","Avaliações","Comentários sobre bebida","Críticas à bebida","Distância do Espaço Überbräu (km)","Bairro","Endereço","Telefone","Instagram","Site","Google Maps"],...filtraEsp().map(e=>[e.n,e.cls,e.c,e.nota,e.av,e.beb,e.beb_crit,e.km,e.bai,e.end,e.tel,e.ig,e.site,e.url])])}
+
+/* QUEM FAZ EVENTO */
+let fSeg="";
+RENDER.eventos=()=>{const segs=Object.keys(ROT).filter(s=>GRP[s]==="evento");
+  $("#fSeg").innerHTML=[["","Todos"],...segs.map(s=>[s,ROT[s]+" · "+A.filter(a=>a.segs.includes(s)).length])].map(([k,l])=>`<button class="chip${k===fSeg?" on":""}" data-k="${k}">${esc(l)}</button>`).join("");
+  $$("#fSeg .chip").forEach(b=>b.onclick=()=>{fSeg=b.dataset.k;$$("#fSeg .chip").forEach(x=>x.classList.toggle("on",x===b));renderEv()});
+  $("#feBai").innerHTML+=[...new Set(A.filter(a=>a.grupo==="evento").map(a=>a.bairro))].filter(Boolean).sort().map(b=>`<option>${esc(b)}</option>`).join("");
+  ["#feQ","#feBai","#fePorte","#feCel","#feMail","#fePrinc"].forEach(s=>$(s).oninput=renderEv);renderEv()};
+function filtraEv(){const q=nrm($("#feQ").value.trim()),bai=$("#feBai").value,po=$("#fePorte").value,cel=$("#feCel").checked,mail=$("#feMail").checked,pr=$("#fePrinc").checked;
+  return A.filter(a=>a.grupo==="evento"&&a.segp!=="casa_de_eventos"&&(!fSeg||a.segs.includes(fSeg))&&(!pr||!a.so_sec)&&(!bai||a.bairro===bai)&&(!po||(po==="mei"?a.mei:!a.mei))&&(!cel||a.cel.length)&&(!mail||a.email)&&(!q||q.split(/\s+/).every(w=>a.k.includes(w))))}
+function renderEv(){const L_=filtraEv();$("#feN").textContent=fmt(L_.length)+" empresas";
+  $("#tEv").innerHTML=L_.slice(0,400).map(a=>`<tr class="cl" onclick="ficha(${a.i})"><td><span class="score" style="background:${scoreCor(a.score)}">${a.score}</span></td><td><b>${esc(a.nome)}</b><div class="small muted">${esc(a.rz!==a.nome?a.rz:"")}</div></td><td><span class="tagc" style="border-color:${SEGCOR[a.segp]}">${esc(ROT[a.segp])}</span></td><td class="small">${a.socios.slice(0,2).map(s=>esc(s.nome)).join("<br>")||'<span class="muted">titular (MEI)</span>'}</td><td class="small" onclick="event.stopPropagation()">${telHTML(a)||'<span class="muted">—</span>'}${a.email?`<br><a href="mailto:${esc(a.email)}">${esc(a.email)}</a>`:""}</td><td class="small">${esc(a.bairro)}</td><td class="small">${a.mei?"MEI":esc(a.porte)}${a.anos!=null?"<br>"+a.anos+" anos":""}</td></tr>`).join("")+(L_.length>400?`<tr><td colspan=7 class="empty">Mostrando 400 de ${fmt(L_.length)} — a lista baixada traz todas.</td></tr>`:"")||`<tr><td colspan=7 class="empty">Nada neste filtro</td></tr>`}
+function csvAlvos(g){const L_=g==="evento"?filtraEv():g==="pdv"?filtraPdv():A.filter(a=>a.grupo===g);
+  download(`uberbrau_${g}.csv`,[["Nota","Empresa","Razão social","CNPJ","Tipo","Sócio 1","Qualificação","Sócio 2","Celular (WhatsApp)","Telefones","E-mail","Endereço","Bairro","CEP","Porte","MEI","Anos","Atividade principal","Abordagem sugerida"],...L_.map(a=>[a.score,a.nome,a.rz,a.cnpj,ROT[a.segp],a.socios[0]?.nome,a.socios[0]?.qual,a.socios[1]?.nome,a.cel.join(" / "),a.tel.join(" / "),a.email,a.end,a.bairro,a.cep,a.porte,a.mei?"sim":"não",a.anos,a.cnae,ABORD[a.segp]])])}
+
+/* VITRINE */
+RENDER.vitrine=()=>{const P=R.publico;const tipos=[...new Set(P.map(p=>p.tipo).filter(Boolean))].sort();$("#fvT").innerHTML+=tipos.map(t=>`<option>${esc(t)}</option>`).join("");
+  const r=()=>{const q=nrm($("#fvQ").value),t=$("#fvT").value;const L_=P.filter(p=>(!t||p.tipo===t)&&(!q||nrm(JSON.stringify(p)).includes(q)));$("#fvN").textContent=L_.length+" organizadores";
+    $("#lPub").innerHTML=L_.map(p=>{const casa=A.find(a=>p.nome&&nrm(a.nome).includes(nrm(p.nome).split(" ").slice(0,2).join(" ")));return`<div class="news"><div style="flex:1;min-width:0"><b>${esc(p.nome)}</b> <span class="tagc">${esc(p.tipo||"")}</span><div class="small muted">${esc((p.eventos||[]).slice(0,3).join(" · "))}${p.publico?" · "+esc(p.publico):""}</div><div class="small">${p.telefone?`<span class="wa">${esc(p.telefone)}</span> · `:""}${p.email?esc(p.email)+" · ":""}${p.instagram?`<a href="${esc(/^http/.test(p.instagram)?p.instagram:"https://instagram.com/"+p.instagram.replace("@",""))}" target="_blank">Instagram</a> · `:""}${p.site?`<a href="${esc(p.site)}" target="_blank">site</a> · `:""}<a href="${esc(p.fonte)}" target="_blank" class="muted">fonte</a></div></div>${casa?`<button class="chip" onclick="ficha(${casa.i})">ficha Receita</button>`:""}</div>`}).join("")||'<div class="empty">A pesquisa pública ainda não foi gravada.</div>'};
+  $("#fvQ").oninput=r;$("#fvT").oninput=r;r();
+  const MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];const ord=c=>{const m=nrm(c.mes||"");const i=MES.findIndex(x=>m.includes(x));return i<0?99:i};
+  const tv=EVT.filter(t=>LG.some(p=>p.t===t));$("#fmT").innerHTML+=tv.map(t=>`<option value="${t}">${esc(TM[t])} · ${LG.filter(p=>p.t===t).length}</option>`).join("");
+  ["#fmQ","#fmT","#fmSo"].forEach(x=>$(x).oninput=renderMaps);renderMaps();
+  $("#lCal").innerHTML=[...R.calendario].sort((a,b)=>ord(a)-ord(b)).map(c=>`<div class="news"><span class="pill" style="min-width:70px;text-align:center">${esc(c.mes||"—")}</span><div><b>${esc(c.evento)}</b><div class="small muted">${esc(c.organizador||"")}${c.publico?" · "+esc(c.publico):""} ${c.fonte?`· <a href="${esc(c.fonte)}" target="_blank">fonte</a>`:""}</div></div></div>`).join("")||'<div class="empty">—</div>'};
+
+function filtraMaps(){const q=nrm($("#fmQ").value.trim()),t=$("#fmT").value,so=$("#fmSo").checked;return LG.filter(p=>EVT.includes(p.t)&&(!t||p.t===t)&&(!so||p.a==null)&&(!q||q.split(/\s+/).every(w=>p.k.includes(w)))).sort((a,b)=>(b.av||0)-(a.av||0))}
+function renderMaps(){const L_=filtraMaps();$("#fmN").textContent=fmt(L_.length)+" lugares";
+  $("#tMaps").innerHTML=L_.map(p=>`<tr><td><b>${esc(p.n)}</b><div class="small muted">${esc(p.c||"")}</div></td><td><span class="tagc" style="border-color:${TC[p.t]}">${esc(TM[p.t])}</span></td><td class="small">${estrela(p)}</td><td class="small">${p.tel?telLink(p.tel):""}${p.ig?`<br><a href="${esc(p.ig)}" target="_blank">Instagram</a>`:""}${p.site?`<br><a href="${esc(p.site)}" target="_blank">site</a>`:""}${p.mail?`<br><a href="mailto:${esc(p.mail)}">${esc(p.mail)}</a>`:""}</td><td class="small">${esc(p.end||"")}</td><td>${p.a!=null?`<button class="chip" onclick="ficha(${p.a})">ficha Receita</button> `:""}<a class="chip" href="${esc(p.url)}" target="_blank" style="margin-top:4px;display:inline-block">Maps</a></td></tr>`).join("")||'<tr><td colspan=6 class="empty">Nada neste filtro</td></tr>'}
+function csvMaps(){download("uberbrau_google_maps.csv",[["Lugar","Tipo","Categoria no Google","Nota","Avaliações","Telefone","Instagram","Site","E-mail","Endereço","Bairro","Google Maps","CNPJ"],...filtraMaps().map(p=>[p.n,TM[p.t],p.c,p.nota,p.av,p.tel,p.ig,p.site,p.mail,p.end,p.bai,p.url,p.a!=null?A[p.a].cnpj:""])])}
+
+/* PDV */
+let fPdv="";let pdvLayer=null;
+RENDER.pdv=()=>{const segs=Object.keys(ROT).filter(s=>GRP[s]==="pdv");$("#fPdv").innerHTML=[["","Todos"],...segs.map(s=>[s,ROT[s]+" · "+A.filter(a=>a.segp===s).length])].map(([k,l])=>`<button class="chip${k===fPdv?" on":""}" data-k="${k}">${esc(l)}</button>`).join("");
+  $$("#fPdv .chip").forEach(b=>b.onclick=()=>{fPdv=b.dataset.k;$$("#fPdv .chip").forEach(x=>x.classList.toggle("on",x===b));renderPdv()});["#fpQ","#fpCel"].forEach(s=>$(s).oninput=renderPdv);renderPdv()};
+function filtraPdv(){const q=nrm($("#fpQ").value.trim()),cel=$("#fpCel").checked;return A.filter(a=>a.grupo==="pdv"&&(!fPdv||a.segp===fPdv)&&(!cel||a.cel.length)&&(!q||q.split(/\s+/).every(w=>a.k.includes(w))))}
+function renderPdv(){const L_=filtraPdv();$("#fpN").textContent=fmt(L_.length)+" pontos";
+  $("#tPdv").innerHTML=L_.slice(0,300).map(a=>`<tr class="cl" onclick="ficha(${a.i})"><td><span class="score" style="background:${scoreCor(a.score)}">${a.score}</span></td><td><b>${esc(a.nome)}</b><div class="small muted">${esc(a.socios[0]?.nome||"")}</div></td><td class="small">${esc(ROT[a.segp])}</td><td class="small" onclick="event.stopPropagation()">${telHTML(a)||"—"}</td><td class="small">${esc(a.bairro)}</td></tr>`).join("");
+  const m=mapa("mapPdv");if(pdvLayer)pdvLayer.remove();pdvLayer=L.layerGroup().addTo(m);L_.forEach(a=>{if(a.lat)L.circleMarker([a.lat,a.lon],{radius:4,color:SEGCOR[a.segp],fillColor:SEGCOR[a.segp],fillOpacity:.8,weight:0}).bindPopup(`<b>${esc(a.nome)}</b><br>${esc(ROT[a.segp])}<br><a href="javascript:void 0" onclick="ficha(${a.i})">abrir ficha</a>`).addTo(pdvLayer)});
+  if(!fPdv)LG.filter(p=>p.t==="pdv"&&p.a==null).forEach(p=>L.circleMarker([p.la,p.lo],{radius:4+Math.sqrt(p.av||0)/8,color:"#f97316",fillOpacity:0,weight:1.5}).bindPopup(popL(p)).addTo(pdvLayer))}
+
+/* CONCORRÊNCIA */
+let fCon="",conLayer=null;
+RENDER.concorrencia=()=>{const tipos=["concorrente_cervejaria","concorrente_chopp","concorrente_distribuidora"];
+  const comNota=CONC.filter(c=>c.nota),avT=CONC.reduce((s,c)=>s+(c.av||0),0);
+  $("#conK").innerHTML=[["Concorrentes mapeados",fmt(CONC.length),`${CONC.filter(c=>c.fonte!=="Receita").length} no Google Maps · ${CONC.filter(c=>c.a!=null).length} com CNPJ`],["Cervejarias e micro",fmt(CONC.filter(c=>c.t==="concorrente_cervejaria").length),"quem também faz cerveja"],["Chopp e distribuidoras",fmt(CONC.filter(c=>c.t!=="concorrente_cervejaria").length),"quem disputa o barril do evento"],["Avaliações somadas",fmt(avT),comNota.length?"nota média "+(comNota.reduce((s,c)=>s+c.nota,0)/comNota.length).toFixed(1).replace(".",",")+" ★":""]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${["#ef4444","#dc2626","#fca5a5","#f2a516"][i]}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+  $("#fCon").innerHTML=[["","Todos · "+CONC.length],...tipos.map(t=>[t,TM[t]+" · "+CONC.filter(c=>c.t===t).length])].map(([k,l])=>`<button class="chip${k===fCon?" on":""}" data-k="${k}">${esc(l)}</button>`).join("");
+  $$("#fCon .chip").forEach(b=>b.onclick=()=>{fCon=b.dataset.k;$$("#fCon .chip").forEach(x=>x.classList.toggle("on",x===b));renderCon()});$("#fcQ").oninput=renderCon;
+  const top=CONC.filter(c=>c.av).slice(0,12),mx=top[0]?top[0].av:1;
+  $("#conTop").innerHTML=top.map(c=>`<div class="hbar"><span class="t" title="${esc(c.n)}">${esc(c.n)}</span><span class="b"><i style="width:${100*c.av/mx}%;background:${TC[c.t]}"></i></span><span class="n">${fmt(c.av)}</span></div>`).join("")+PROPRIOS.filter(p=>p.av).map(p=>`<div class="hbar"><span class="t" style="color:var(--ac2)">★ ${esc(p.n)}</span><span class="b"><i style="width:${Math.min(100,100*p.av/mx)}%;background:#ffcf5a"></i></span><span class="n">${fmt(p.av)}</span></div>`).join("");
+  const br=R.bairros.filter(b=>b.pessoas>=2000).map(b=>{const k=1500;const c=CONC.filter(x=>x.la&&dist(b.lat,b.lon,x.la,x.lo)<=k).length,ba=LG.filter(p=>p.t==="pdv"&&dist(b.lat,b.lon,p.la,p.lo)<=k).length;const a39=Math.round(b.pessoas*b.j25/100);return{...b,c,ba,a39,ind:a39/(1+c)}}).sort((x,y)=>y.ind-x.ind).slice(0,25);
+  $("#tBranco").innerHTML=br.map(b=>`<tr class="cl" onclick="estudarAqui(${b.lat},${b.lon})"><td><b>${esc(b.nome)}</b></td><td>${fmt(b.a39)}</td><td>${brl(b.renda)}</td><td style="${b.c?"":"color:#4ade80;font-weight:700"}">${b.c}</td><td>${b.ba}</td></tr>`).join("");
+  renderCon()};
+function filtraCon(){const q=nrm($("#fcQ").value.trim());return CONC.filter(c=>(!fCon||c.t===fCon)&&(!q||q.split(/\s+/).every(w=>c.k.includes(w))))}
+function renderCon(){const L_=filtraCon();$("#fcN").textContent=fmt(L_.length)+" concorrentes";
+  $("#tCon").innerHTML=L_.map(c=>`<tr${c.a!=null?` class="cl" onclick="ficha(${c.a})"`:""}><td><b>${esc(c.n)}</b><div class="small muted">${esc(c.c||"")}</div></td><td><span class="tagc" style="border-color:${TC[c.t]}">${esc(TM[c.t])}</span></td><td class="small">${estrela(c)}</td><td class="small" onclick="event.stopPropagation()">${c.tel?telLink(c.tel):""}${c.ig?`<br><a href="${esc(c.ig)}" target="_blank">Instagram</a>`:""}${c.site?`<br><a href="${esc(c.site)}" target="_blank">site</a>`:""}</td><td class="small">${esc(c.bai||"")}<div class="muted">${esc((c.end||"").split(" - ")[0])}</div></td><td class="small">${esc(c.fonte)}${c.anos!=null?`<div class="muted">${c.anos} anos de CNPJ</div>`:""}${c.url?`<div><a href="${esc(c.url)}" target="_blank" onclick="event.stopPropagation()">Maps</a></div>`:""}</td></tr>`).join("")||'<tr><td colspan=6 class="empty">Nada neste filtro</td></tr>';
+  const m=mapa("mapCon");if(conLayer)conLayer.remove();conLayer=L.layerGroup().addTo(m);
+  L_.forEach(c=>{if(c.la)L.circleMarker([c.la,c.lo],{radius:4+Math.sqrt(c.av||0)/4,color:TC[c.t],fillColor:TC[c.t],fillOpacity:.75,weight:1}).bindPopup(`<b>${esc(c.n)}</b><br>${esc(TM[c.t])} · ${esc(c.fonte)}<br>${estrela(c)}<br>${esc(c.end||"")}${c.a!=null?`<br><a href="javascript:void 0" onclick="ficha(${c.a})">ficha da Receita →</a>`:""}`).addTo(conLayer)});
+  PROPRIOS.forEach(p=>L.circleMarker([p.la,p.lo],{radius:10,color:"#fff",fillColor:"#ffcf5a",fillOpacity:1,weight:2}).bindPopup(popL(p)).addTo(conLayer))}
+function csvCon(){download("uberlandia_concorrentes.csv",[["Concorrente","Tipo","Categoria","Nota Google","Avaliações","Telefone","Instagram","Site","Endereço","Bairro","Fonte","Anos de CNPJ","CNPJ","Google Maps"],...filtraCon().map(c=>[c.n,TM[c.t],c.c,c.nota,c.av,c.tel,c.ig,c.site,c.end,c.bai,c.fonte,c.anos,c.a!=null?A[c.a].cnpj:"",c.url])])}
+
+/* MAPA & EXPANSÃO */
+RENDER.mapa=()=>{const m=mapa("mapa",[-18.915,-48.275],12);
+  m.on("click",e=>L.popup().setLatLng(e.latlng).setContent(`<a href="javascript:void 0" onclick="estudarAqui(${e.latlng.lat},${e.latlng.lng})">◎ Estudar o raio deste local →</a>`).openOn(m));
+  const O=R.osm||{},X=R.expansao||[];const cm=(la,lo,r,c,o={})=>L.circleMarker([la,lo],Object.assign({radius:r,color:c,fillColor:c,fillOpacity:.75,weight:1},o));
+  const osmL=(ks,cor,r)=>L.layerGroup(ks.flatMap(k=>(O[k]||[]).map(x=>cm(x[0],x[1],r,cor,{weight:0,fillOpacity:.6}).bindPopup(`<b>${esc(x[2]||"(sem nome)")}</b><br><span class="muted">${esc(x[3])} · OpenStreetMap</span>`))));
+  const rmx=Math.max(1,...R.setores.map(s=>s[3]||0));
+  const evR=A.filter(a=>a.grupo==="evento"&&!a.so_sec&&a.lat&&a.segp!=="casa_de_eventos");
+  const camadas={
+    "Uberbrau":L.layerGroup(PROPRIOS.map(p=>cm(p.la,p.lo,11,"#ffcf5a",{color:"#fff",weight:2,fillOpacity:1}).bindPopup(popL(p)))),
+    "Concorrência":L.layerGroup(CONC.filter(c=>c.la).map(c=>cm(c.la,c.lo,4+Math.sqrt(c.av||0)/4,TC[c.t]).bindPopup(`<b>${esc(c.n)}</b><br>${esc(TM[c.t])} · ${esc(c.fonte)}<br>${estrela(c)}<br>${esc(c.end||"")}`))),
+    "Melhores áreas · ponto e degustação":L.layerGroup(X.map((e,i)=>L.circle([e.lat,e.lon],{radius:700,color:"#fbbf24",fillColor:"#fbbf24",fillOpacity:.18,weight:2}).bindPopup(`<b>${i+1}. ${esc(e.bairro)}</b> · nota ${Math.round(e.nota)}<ul style="padding-left:16px;margin:6px 0">${e.motivos.map(x=>`<li>${esc(x)}</li>`).join("")}</ul><a href="javascript:void 0" onclick="estudarAqui(${e.lat},${e.lon})">◎ estudar o raio →</a><div class="small muted" style="margin-top:4px">Censo 2022 + Receita + Google Maps; não mede fluxo de pessoas.</div>`)))};
+  const ini=Object.keys(camadas);
+  Object.assign(camadas,{
+    "Quem faz evento":L.layerGroup([...evR.map(a=>cm(a.lat,a.lon,3.5,SEGCOR[a.segp]||"#f2a516",{weight:0}).bindPopup(`<b>${esc(a.nome)}</b><br>${esc(ROT[a.segp])}<br><a href="javascript:void 0" onclick="ficha(${a.i})">abrir ficha</a>`)),...LG.filter(p=>EVT.includes(p.t)&&p.t!=="espaco"&&p.a==null).map(p=>cm(p.la,p.lo,4,TC[p.t],{fillOpacity:0,weight:1.5}).bindPopup(popL(p)))]),
+    "Espaços de evento":L.layerGroup([...LG.filter(p=>p.t==="espaco").map(p=>cm(p.la,p.lo,4+Math.sqrt(p.av||0)/6,"#94a3b8").bindPopup(popL(p))),...A.filter(a=>a.segp==="casa_de_eventos"&&a.lat&&!a.maps).map(a=>cm(a.lat,a.lon,3.5,"#94a3b8",{fillOpacity:.35}).bindPopup(`<b>${esc(a.nome)}</b><br>Casa de eventos · Receita<br><a href="javascript:void 0" onclick="ficha(${a.i})">abrir ficha</a>`))]),
+    "Bares, adegas e PDV":L.layerGroup([...LG.filter(p=>p.t==="pdv").map(p=>cm(p.la,p.lo,3.5+Math.sqrt(p.av||0)/6,"#f97316").bindPopup(popL(p))),...A.filter(a=>(a.segp==="bar_noite"||a.segp==="adega_bebidas")&&a.lat&&!a.maps).map(a=>cm(a.lat,a.lon,2.5,"#f97316",{weight:0,fillOpacity:.35}).bindPopup(`<b>${esc(a.nome)}</b><br>${esc(ROT[a.segp])} · Receita<br><a href="javascript:void 0" onclick="ficha(${a.i})">abrir ficha</a>`))]),
+    "Público 25–39 · renda":L.layerGroup(R.setores.filter(s=>s[4]>0).map(s=>{const c=`hsl(${30+90*Math.min(1,(s[3]||0)/rmx*2.2)},70%,48%)`;return L.circle([s[0],s[1]],{radius:40+Math.sqrt(s[4])*5,color:c,fillColor:c,fillOpacity:.3,weight:0}).bindPopup(`<b>Setor do Censo 2022</b><br>${fmt(s[2])} moradores · ${fmt(s[4])} de 25 a 39<br>Renda média do responsável ${brl(s[3])}`)})),
+    "Universidades e faculdades":osmL(["ensino_superior"],"#a78bfa",7),
+    "Escolas":osmL(["escola"],"#c4b5fd",3),
+    "Paradas de ônibus":osmL(["onibus"],"#64748b",2),
+    "Onde a cidade se reúne":osmL(["evento","estadio","shopping","parque"],"#22d3ee",5)});
+  const on={};ini.forEach(k=>{camadas[k].addTo(m);on[k]=1});
+  const n=k=>camadas[k].getLayers().length;
+  $("#fCamada").innerHTML=Object.keys(camadas).map(k=>`<button class="chip${on[k]?" on":""}" data-k="${esc(k)}">${esc(k)} · ${fmt(n(k))}</button>`).join("");
+  $$("#fCamada .chip").forEach(b=>b.onclick=()=>{const k=b.dataset.k;on[k]=!on[k];b.classList.toggle("on",on[k]);on[k]?camadas[k].addTo(m):camadas[k].remove()});
+  $("#legMapa").innerHTML=`<span><i style="background:#ffcf5a"></i>Uberbrau</span><span><i style="background:#ef4444"></i>Cervejaria</span><span><i style="background:#dc2626"></i>Chopp</span><span><i style="background:#fca5a5"></i>Distribuidora</span><span><i style="background:#fbbf24;opacity:.5"></i>Melhor área</span><span><i style="background:#f2a516"></i>Quem faz evento (○ só no Maps)</span><span><i style="background:#94a3b8"></i>Espaço de evento</span><span><i style="background:#f97316"></i>Bar / adega</span><span><i style="background:#a78bfa"></i>Ensino superior</span><span><i style="background:#64748b"></i>Ônibus</span><span><i style="background:#22d3ee"></i>Onde a cidade se reúne</span><span class="muted">· tamanho = avaliações no Google · clique no mapa para estudar o raio</span>`;
+  $("#tExp").innerHTML=X.map((e,i)=>`<tr class="cl" onclick="estudarAqui(${e.lat},${e.lon})"><td class="muted">${i+1}</td><td><b>${esc(e.bairro)}</b></td><td><span class="score" style="background:hsl(${Math.max(0,e.nota)*1.6},65%,38%)">${Math.round(e.nota)}</span></td><td>${fmt(e.a39)}</td><td>${brl(e.renda)}</td><td>${e.noite}</td><td>${e.ev}</td><td style="${e.conc?"":"color:#4ade80;font-weight:700"}">${e.conc}</td><td class="small muted">${esc(e.motivos.slice(-1)[0])}</td></tr>`).join("")||'<tr><td colspan=9 class="empty">Sem Censo nesta montagem.</td></tr>'};
+function csvExp(){download("uberbrau_areas_expansao.csv",[["#","Bairro","Nota","Lat","Lon","Moradores a 1 km","25-39 a 1 km","Renda média resp.","Bares/adegas a 1 km","Empresas de evento a 1 km","Concorrentes a 1 km","Distância de um ponto Uberbrau (km)","Motivos"],...(R.expansao||[]).map((e,i)=>[i+1,e.bairro,e.nota,e.lat,e.lon,e.pessoas,e.a39,e.renda,e.noite,e.ev,e.conc,e.proprio!=null?e.proprio.toFixed(1):"",e.motivos.join(" | ")])])}
+
+/* ESTUDO DE RAIO */
+let RZ={lat:-18.9186,lon:-48.2772},rzLayer=null,rzEmp=[],rzResumo="";
+const fmtM=d=>d<1000?Math.round(d)+" m":(d/1000).toLocaleString("pt-BR",{maximumFractionDigits:1})+" km";
+RENDER.raio=()=>{const m=mapa("mapRaio",[RZ.lat,RZ.lon],14);m.on("click",e=>{RZ={lat:e.latlng.lat,lon:e.latlng.lng};renderRaio()});
+  $("#rzB").innerHTML+=[...R.bairros].sort((a,b)=>a.nome.localeCompare(b.nome)).map((b,i)=>`<option value="${b.lat},${b.lon}">${esc(b.nome)}</option>`).join("");
+  $("#rzB").oninput=()=>{const v=$("#rzB").value;if(v){const[a,b]=v.split(",").map(Number);RZ={lat:a,lon:b};renderRaio(true)}};
+  $("#rzR").oninput=()=>renderRaio(true);let t;$("#rzRamo").oninput=()=>{clearTimeout(t);t=setTimeout(renderRaio,250)};renderRaio(true)};
+function renderRaio(centrar){if(!init.raio){init.raio=1;RENDER.raio();return}
+  const r=+$("#rzR").value,{lat,lon}=RZ,m=MAPS.mapRaio;const dla=r/111320*1e4,dlo=r/(111320*Math.cos(lat*RAD))*1e4,la0=lat*1e4,lo0=lon*1e4;
+  rzEmp=[];const cc={};for(let i=0;i<NE;i++){const a=E.la[i],b=E.lo[i];if(a<la0-dla||a>la0+dla||b<lo0-dlo||b>lo0+dlo)continue;const d=dist(lat,lon,a/1e4,b/1e4);if(d>r)continue;rzEmp.push([i,d]);cc[E.c[i]]=(cc[E.c[i]]||0)+1}
+  const ws=nrm($("#rzRamo").value.trim()).split(/\s+/).filter(Boolean).map(w=>w.replace(/s$/,""));
+  const ramo=ws.length?rzEmp.filter(([i])=>ws.every(w=>cnN[E.c[i]].includes(w)||nrm(E.n[i]).includes(w))).sort((a,b)=>a[1]-b[1]):[];
+  const ev=A.filter(a=>a.grupo==="evento"&&a.lat&&dist(lat,lon,a.lat,a.lon)<=r);
+  const cr=CONC.filter(c=>c.la&&dist(lat,lon,c.la,c.lo)<=r),br=LG.filter(p=>p.t==="pdv"&&dist(lat,lon,p.la,p.lo)<=r);
+  let pes=0,dom=0,i14=0,i24=0,i39=0,rs=0,rd=0;R.setores.forEach(s=>{if(dist(lat,lon,s[0],s[1])<=r){pes+=s[2];i39+=s[4];i24+=s[5];dom+=s[6];if(s[3]){rs+=s[3]*s[6];rd+=s[6]}}});
+  if(rzLayer)rzLayer.remove();rzLayer=L.layerGroup().addTo(m);
+  L.circle([lat,lon],{radius:r,color:"#0f62fe",weight:2,fillOpacity:.06,interactive:false}).addTo(rzLayer);L.circleMarker([lat,lon],{radius:7,color:"#fff",fillColor:"#0f62fe",fillOpacity:1,weight:2}).addTo(rzLayer);
+  const step=Math.max(1,Math.ceil(rzEmp.length/2500));rzEmp.forEach(([i],j)=>{if(j%step)return;L.circleMarker([E.la[i]/1e4,E.lo[i]/1e4],{radius:2.3,color:"#d6c2a5",weight:0,fillOpacity:.45}).bindPopup(`<b>${esc(E.n[i])}</b><br>${esc(CN[E.c[i]][1])}`).addTo(rzLayer)});
+  ramo.forEach(([i])=>L.circleMarker([E.la[i]/1e4,E.lo[i]/1e4],{radius:5,color:"#fb7185",fillColor:"#fb7185",fillOpacity:.9,weight:1}).bindPopup(`<b>${esc(E.n[i])}</b><br>${esc(CN[E.c[i]][1])}`).addTo(rzLayer));
+  ev.forEach(a=>L.circleMarker([a.lat,a.lon],{radius:6,color:"#f2a516",fillColor:"#f2a516",fillOpacity:.95,weight:1}).bindPopup(`<b>${esc(a.nome)}</b><br>${esc(ROT[a.segp])}<br><a href="javascript:void 0" onclick="ficha(${a.i})">abrir ficha</a>`).addTo(rzLayer));
+  cr.forEach(c=>L.circleMarker([c.la,c.lo],{radius:6,color:"#fff",fillColor:"#ef4444",fillOpacity:.95,weight:1}).bindPopup(`<b>${esc(c.n)}</b><br>${esc(TM[c.t])}<br>${estrela(c)}`).addTo(rzLayer));
+  PROPRIOS.forEach(p=>L.circleMarker([p.la,p.lo],{radius:9,color:"#fff",fillColor:"#ffcf5a",fillOpacity:1,weight:2}).bindPopup(popL(p)).addTo(rzLayer));
+  if(centrar)m.fitBounds(L.latLng(lat,lon).toBounds(r*2.3));
+  const renda=rd?rs/rd:null;
+  $("#rzK").innerHTML=[["Moradores",fmt(pes),fmt(dom)+" domicílios"],["Adultos 25–39",fmt(i39),pes?pct(100*i39/pes)+" dos moradores":""],["Renda média do responsável",brl(renda),"Censo 2022"],["Empresas ativas",fmt(rzEmp.length),"Receita Federal"],["Atividade buscada",ws.length?fmt(ramo.length):"—",ramo.length?"a mais perto a "+fmtM(ramo[0][1]):""],["Quem faz evento",fmt(ev.length),"no radar da Uberbrau"],["Concorrentes",fmt(cr.length),cr.length?"o mais perto a "+fmtM(Math.min(...cr.map(c=>dist(lat,lon,c.la,c.lo)))):"nenhum no raio"],["Bares e adegas no Google",fmt(br.length),br.length?fmt(br.reduce((s,p)=>s+(p.av||0),0))+" avaliações somadas":""]].map(([l,v,s])=>`<div class="card kpi"><div class="l">${l}</div><div class="v" style="font-size:22px">${v}</div><div class="s">${esc(s)}</div></div>`).join("");
+  const top=Object.entries(cc).sort((a,b)=>b[1]-a[1]).slice(0,12),mx=top[0]?top[0][1]:1;
+  $("#rzAtiv").innerHTML=top.map(([c,v])=>`<div class="hbar" style="cursor:pointer" onclick="$('#rzRamo').value=CN[${c}][1];renderRaio()"><span class="t" title="${esc(CN[c][1])}">${esc(CN[c][1])}</span><span class="b"><i style="width:${100*v/mx}%"></i></span><span class="n">${fmt(v)}</span></div>`).join("")||'<div class="empty">Nenhuma empresa no raio</div>';
+  chart("chRzIdade",{type:"doughnut",data:{labels:["0–14","15–24","25–39","40+"],datasets:[{data:[0,i24,i39,0].map((v,i)=>i===0?Math.max(0,pes-i24-i39-0)*0:v),backgroundColor:PAL,borderWidth:0}]},options:{plugins:{legend:{position:"right"}}}});
+  const rest=Math.max(0,pes-i24-i39);charts.chRzIdade.data.labels=["15–24","25–39","demais idades"];charts.chRzIdade.data.datasets[0].data=[i24,i39,rest];charts.chRzIdade.update();
+  rzResumo=`Num raio de ${fmtM(r)} deste ponto de Uberlândia moram ${fmt(pes)} pessoas (${fmt(i39)} entre 25 e 39 anos), com renda média do responsável de ${brl(renda)}. Há ${fmt(rzEmp.length)} empresas ativas`+(ws.length?`, ${fmt(ramo.length)} de “${$("#rzRamo").value}”`:"")+` e ${fmt(ev.length)} empresas que fazem evento; ${cr.length?fmt(cr.length)+" concorrente"+(cr.length>1?"s":""):"nenhum concorrente"} e ${fmt(br.length)} bares e adegas no Google Maps.`;$("#rzTxt").textContent=rzResumo}
+function csvRaio(){download("empresas_no_raio.csv",[["Empresa","Atividade","Código CNAE","Bairro","MEI","Distância (m)"],...rzEmp.sort((a,b)=>a[1]-b[1]).map(([i,d])=>[E.n[i],CN[E.c[i]][1],CN[E.c[i]][0],R.emp.bairros[E.b[i]],E.m[i]?"sim":"não",Math.round(d)])])}
+
+/* PÚBLICO */
+const PERS=[["Cerveja artesanal (25–39, renda)",{wR:4,wJ:1,wA:5,wM:1,wS:0,wO:2,wP:2,wT:2}],["Universitário",{wR:0,wJ:5,wA:2,wM:0,wS:0,wO:3,wP:2,wT:1}],["Alta renda",{wR:5,wJ:0,wA:1,wM:2,wS:1,wO:0,wP:3,wT:1}],["Famílias e churrasco (40–59)",{wR:2,wJ:0,wA:1,wM:5,wS:1,wO:0,wP:0,wT:3}],["Volume",{wR:0,wJ:1,wA:1,wM:1,wS:0,wO:0,wP:0,wT:5}]];
+let pubLayer=null,pubAtual=[];const baresPorBairro={};A.filter(a=>a.segp==="bar_noite").forEach(a=>{const k=nrm(a.bairro);baresPorBairro[k]=(baresPorBairro[k]||0)+1});
+RENDER.publico=()=>{$("#persona").innerHTML=PERS.map(([n],i)=>`<button class="chip${i?"":" on"}" data-i="${i}">${n}</button>`).join("");
+  $$("#persona .chip").forEach(b=>b.onclick=()=>{$$("#persona .chip").forEach(x=>x.classList.toggle("on",x===b));Object.entries(PERS[+b.dataset.i][1]).forEach(([k,v])=>$("#"+k).value=v);renderPub()});
+  ["wR","wJ","wA","wM","wS","wO","wP","wT"].forEach(k=>$("#"+k).oninput=()=>renderPub());renderPub()};
+function renderPub(){const w=k=>+$("#"+k).value;["R","J","A","M","S","O","P","T"].forEach(l=>$("#v"+l).textContent=w("w"+l));
+  const F=[["wR",b=>b.renda],["wJ",b=>b.j15],["wA",b=>b.j25],["wM",b=>b.a40],["wS",b=>b.s60],["wO",b=>b.sozinho],["wP",b=>b.apto],["wT",b=>Math.log(b.pessoas||1)]];
+  const lst=R.bairros;const st=F.map(([k,f])=>{const v=lst.map(f).filter(x=>x!=null);return[k,f,Math.min(...v),Math.max(...v)]});const tw=st.reduce((s,[k])=>s+w(k),0)||1;
+  lst.forEach(b=>{b.fit=Math.round(100*st.reduce((s,[k,f,mn,mx])=>{const v=f(b);return s+w(k)*(v==null||mx===mn?.5:(v-mn)/(mx-mn))},0)/tw);b.bares=baresPorBairro[nrm(b.nome)]||0});
+  const S=pubAtual=[...lst].sort((a,b)=>b.fit-a.fit);
+  $("#tPub").innerHTML=S.slice(0,120).map((b,i)=>`<tr class="cl" onclick="ir('raio');RZ={lat:${b.lat},lon:${b.lon}};renderRaio(true)"><td class="muted">${i+1}</td><td><b>${esc(b.nome)}</b></td><td><span class="score" style="background:hsl(${b.fit*1.2},65%,38%)">${b.fit}</span></td><td>${fmt(b.pessoas)}</td><td>${brl(b.renda)}</td><td>${pct(b.j25)}</td><td>${pct(b.apto)}</td><td>${b.bares||"—"}</td></tr>`).join("");
+  const m=mapa("mapPub");if(pubLayer)pubLayer.remove();pubLayer=L.layerGroup().addTo(m);
+  [...S].reverse().forEach(b=>{const c=`hsl(${b.fit*1.2},75%,50%)`;L.circleMarker([b.lat,b.lon],{radius:3+Math.sqrt(b.pessoas)/12,color:c,fillColor:c,fillOpacity:.55,weight:1}).bindPopup(`<b>${esc(b.nome)}</b><br>Fit ${b.fit} · ${fmt(b.pessoas)} moradores<br>Renda resp. ${brl(b.renda)} · 25–39 ${pct(b.j25)}<br><a href="javascript:void 0" onclick="ir('raio');RZ={lat:${b.lat},lon:${b.lon}};renderRaio(true)">estudar o raio →</a>`).addTo(pubLayer)})}
+function csvPub(){download("uberlandia_bairros.csv",[["Bairro","Fit","Moradores","Domicílios","Renda média resp.","% 15-24","% 25-39","% 40-59","% 60+","% mora sozinho","% apartamento","Bares"],...pubAtual.map(b=>[b.nome,b.fit,b.pessoas,b.dom,b.renda,b.j15,b.j25,b.a40,b.s60,b.sozinho,b.apto,b.bares])])}
+
+/* CONSUMO */
+RENDER.consumo=()=>{if(!R.pix){$("#pxK").innerHTML='<div class="empty">Pix indisponível nesta montagem.</div>';return}const C=R.pix.cidades,U=C["3170206"];const MES=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  $("#pxK").innerHTML=[["Pix das pessoas (12m)",brl(U.pf_12m),(U.cresc_pf>0?"+":"")+pct(U.cresc_pf)+" em 12 meses"],["Por habitante",U.pop?brl(U.pf_12m/U.pop):"—","Pix pago por pessoa física"],["Comércio recebeu (12m)",brl(U.pj_12m),(U.cresc_pj>0?"+":"")+pct(U.cresc_pj)+" em 12 meses"],["População",fmt(U.pop),"IBGE, estimativa 2025"]].map(([l,v,s])=>`<div class="card kpi"><div class="l">${l}</div><div class="v" style="font-size:22px">${v}</div><div class="s">${esc(s)}</div></div>`).join("");
+  const saz=U.saz.map(v=>v==null?null:Math.round((v-1)*1000)/10);chart("chSaz",{type:"bar",data:{labels:MES,datasets:[{data:saz,backgroundColor:saz.map(v=>v>0?"#0f62fe":"#a8a8a8"),borderRadius:0}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>(c.raw>0?"+":"")+pct(c.raw)+" vs mês médio"}}},scales:{y:{ticks:{callback:v=>(v>0?"+":"")+v+"%"}}}}});
+  const o=saz.map((v,i)=>[v,i]).filter(x=>x[0]!=null).sort((a,b)=>b[0]-a[0]);$("#sazTxt").innerHTML=o.length?`O comércio de Uberlândia mais fatura em <b>${o.slice(0,3).map(x=>MES[x[1]]).join(", ")}</b> e menos em <b>${o.slice(-2).map(x=>MES[x[1]]).join(" e ")}</b>. Prospecção de evento entra 6–8 semanas antes do pico.`:"";
+  chart("chPx",{type:"line",data:{labels:R.pix.meses,datasets:[{data:U.serie_pj,borderColor:"#0f62fe",backgroundColor:"rgba(15,98,254,.12)",fill:true,tension:0,pointRadius:2}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>brl(c.raw)}}},scales:{y:{ticks:{callback:v=>brl(v)}}}}});
+  $("#tPx").innerHTML=Object.values(C).sort((a,b)=>(b.pop||0)-(a.pop||0)).map(c=>`<tr${c.nome==="Uberlândia"?' style="background:rgba(242,165,22,.12)"':""}><td><b>${esc(c.nome)}</b></td><td>${fmt(c.pop)}</td><td>${brl(c.pf_12m)}</td><td>${c.pop?brl(c.pf_12m/c.pop):"—"}</td><td>${pct(c.cresc_pf)}</td><td>${brl(c.pj_12m)}</td><td>${pct(c.cresc_pj)}</td></tr>`).join("")};
+
+/* CERVEJARIAS REGISTRADAS + ABRIU × FECHOU */
+RENDER.mercado=()=>{const M=R.mapa,D=R.dinamica;
+  if(M){const U=M.uberlandia,an=M.anuario?.uberlandia||{};
+    $("#mkK").innerHTML=[["Cervejarias com fábrica",fmt(U.ativas_fabrica_propria),`${fmt(U.estabelecimentos_bebidas_ativos)} estabelecimentos de bebida ativos no MAPA`],["Posição em Minas",M.mg.posicao_uberlandia?M.mg.posicao_uberlandia+"º":"—",`de ${fmt(M.mg.municipios_com_cervejaria)} municípios com cervejaria`],["Posição no Brasil",M.brasil.posicao_uberlandia?M.brasil.posicao_uberlandia+"º":"—",`${fmt(M.brasil.total_ativas)} cervejarias no país`],["Cervejas registradas (anuário)",fmt(an.cervejas_registradas),an.posicao_mg_cervejas_registradas?`${an.posicao_mg_cervejas_registradas}º de MG · ${an.posicao_brasil_cervejas_registradas}º do Brasil · ano-ref. ${M.anuario.ano_ref}`:""]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${PAL[i]}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+    const nm=f=>f.nome_fantasia&&!nrm(f.razao_social).includes(nrm(f.nome_fantasia))?`${esc(f.nome_fantasia)} <span class="small muted">${esc(f.razao_social)}</span>`:esc(f.razao_social);
+    $("#tMk").innerHTML=U.cervejarias.filter(f=>f.fabrica_propria&&/ativ/i.test(f.situacao)).map(f=>`<tr${/uberbrau/i.test(f.razao_social)?' style="font-weight:600"':""}><td>${/uberbrau/i.test(f.razao_social)?'<span style="color:var(--marca)">●</span> ':""}${nm(f)}</td><td class="mono small">${esc(f.cnpj||f.cnpj_mascarado||"—")}</td><td class="mono small">${esc(f.registro)}</td></tr>`).join("");
+    const canc=U.cervejarias.filter(f=>!/ativ/i.test(f.situacao));
+    $("#mkCap").textContent=`SIPEAGRO, atualizado em ${(M.fontes?.sipeagro?.atualizado_em||"").split("-").reverse().join("/")}. Cervejaria = registro de bebida + CNAE de cerveja na Receita ou nome de cervejaria.${canc.length?` Registros cancelados: ${canc.map(f=>f.razao_social).join(", ")}.`:""}`;
+    const mx=Math.max(...M.mg.por_municipio.map(x=>x.cervejarias));
+    $("#mkMg").innerHTML=M.mg.por_municipio.slice(0,15).map(x=>`<div class="hbar"><span class="t"${/uberl/i.test(x.municipio)?' style="font-weight:600;color:var(--tx)"':""}>${x.posicao}º ${esc(x.municipio)}</span><span class="b"><i style="width:${100*x.cervejarias/mx}%${/uberl/i.test(x.municipio)?";background:var(--marca)":""}"></i></span><span class="n">${x.cervejarias}</span></div>`).join("");
+    $("#tMkR").innerHTML=M.regiao.cervejarias.filter(f=>f.fabrica_propria&&/ativ/i.test(f.situacao)).map(f=>`<tr><td>${esc(f.municipio)}</td><td>${nm(f)}</td><td class="mono small">${esc(f.registro)}</td></tr>`).join("")||'<tr><td colspan=3 class="empty">—</td></tr>'}
+  else $("#mkK").innerHTML='<div class="empty">Rode coleta/mapa_cervejarias.py</div>';
+  if(D){$("#dnS").innerHTML=`<option value="">Toda a cidade</option>`+Object.keys(D.segmentos).map(k=>`<option value="${k}">${esc(R.rotulo[k]||k)}</option>`).join("");$("#dnS").value="bar_noite";$("#dnS").oninput=renderDin;renderDin()}};
+function renderDin(){const D=R.dinamica,k=$("#dnS").value,S=k?D.segmentos[k]:D.cidade,an=D.anos.map(a=>a===D.ano_parcial?a+"*":String(a));
+  chart("chDin",{type:"bar",data:{labels:an,datasets:[{label:"Abriram",data:S.abertos,backgroundColor:"#0f62fe"},{label:"Fecharam (baixa)",data:S.baixados,backgroundColor:"#fa4d56"}]},options:{plugins:{legend:{position:"top",align:"end"}}}});
+  const n=S.abertos.length-1,ab=S.abertos.slice(n-3,n).reduce((a,b)=>a+b,0),fe=S.baixados.slice(n-3,n).reduce((a,b)=>a+b,0);
+  $("#dnTxt").textContent=`${D.anos[n-3]}–${D.anos[n-1]}: ${fmt(ab)} abriram, ${fmt(fe)} fecharam — saldo ${ab-fe>=0?"+":""}${fmt(ab-fe)}`+(k&&S.situacao?` · hoje: ${fmt(S.situacao.ativa||0)} ativas`:"");
+  $("#dnCap").textContent=D.nota+" Conta só a atividade PRINCIPAL. * ano parcial.";renderCg()}
+function renderCg(){const G=R.caged;if(!G){$("#cgCard").style.display="none";return}const k=$("#dnS").value,M=k?G.segmentos.mensal[k]:G.cidade.mensal,MS=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  chart("chCg",{data:{labels:M.map(m=>MS[+m.competencia.slice(5)-1]+"/"+m.competencia.slice(2,4)),datasets:[{type:"bar",label:"Saldo",data:M.map(m=>m.saldo),backgroundColor:M.map(m=>m.saldo>=0?"#198038":"#fa4d56")},{type:"line",label:"Admissões",data:M.map(m=>m.admissoes),borderColor:"#0f62fe",tension:.3,pointRadius:0,yAxisID:"y1"}]},options:{plugins:{legend:{position:"top",align:"end"}},scales:{y:{title:{display:true,text:"saldo"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"admissões"}}}}});
+  if(!$("#tCg").rows.length){const T=G.segmentos.total_12m;$("#tCg").innerHTML=Object.entries(T).sort((a,b)=>b[1].admissoes-a[1].admissoes).map(([s,v])=>`<tr class="cl" onclick="$('#dnS').value='${s}';renderDin()"><td><b>${esc(R.rotulo[s]||s)}</b></td><td>${fmt(v.admissoes)}</td><td>${fmt(v.desligamentos)}</td><td style="color:${v.saldo>=0?"var(--ok)":"var(--bad)"};font-weight:600">${v.saldo>0?"+":""}${fmt(v.saldo)}</td><td>${brl(v.salario_medio_admissao)}</td><td class="small">${esc((v.top_cbo||[]).slice(0,2).map(c=>(c.nome||c.cbo)+" ("+c.admissoes+")").join(" · "))}</td></tr>`).join("");
+    const c=G.cidade.total_12m,u=G.ultimos_12_meses;$("#cgCap").textContent=`Novo CAGED (Ministério do Trabalho), ${u[0].split("-").reverse().join("/")} a ${u[u.length-1].split("-").reverse().join("/")}. Cidade inteira: ${fmt(c.admissoes)} admissões, saldo ${c.saldo>0?"+":""}${fmt(c.saldo)}. ${G.nota}`}}
+
+/* INSTAGRAM E BUSCAS */
+const IG=R.instagram;
+const igMet=p=>{const ps=p.posts||[];if(!ps.length||!p.seguidores)return{};const ds=ps.map(x=>x.data).filter(Boolean).sort(),dias=Math.max(1,(new Date(ds[ds.length-1])-new Date(ds[0]))/864e5),cur=ps.reduce((s,x)=>s+(x.curtidas>0?x.curtidas:0),0),com=ps.reduce((s,x)=>s+(x.comentarios||0),0);return{pm:ps.length/(dias/30.4),cpp:cur/ps.length,eng:100*(cur+com)/ps.length/p.seguidores,vid:100*ps.filter(x=>x.tipo==="Video").length/ps.length,ult:ds[ds.length-1]}};
+RENDER.redes=()=>{if(IG){const P=IG.perfis.filter(p=>p.seguidores).sort((a,b)=>b.seguidores-a.seguidores),U=P.filter(p=>p.tipo==="uberbrau"),C=P.filter(p=>p.tipo!=="uberbrau");
+    const u=U.sort((a,b)=>b.seguidores-a.seguidores)[0],mu=u?igMet(u):{},lider=C[0];const engC=C.map(p=>igMet(p).eng).filter(x=>x!=null).sort((a,b)=>a-b);
+    $("#igK").innerHTML=[["Seguidores — Uberbrau",u?fmt(u.seguidores):"—",u?"@"+u.usuario:""],["Maior concorrente",lider?fmt(lider.seguidores):"—",lider?"@"+lider.usuario+" · "+lider.nome:""],["Engajamento — Uberbrau",mu.eng!=null?pct(mu.eng):"—",engC.length?"mediana dos concorrentes: "+pct(engC[Math.floor(engC.length/2)]):""],["Perfis comparados",fmt(P.length),`coletado em ${IG.coletado_em.split("-").reverse().join("/")}`]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${PAL[i]}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+    $("#tIg").innerHTML=P.map(p=>{const m=igMet(p),ub=p.tipo==="uberbrau";return`<tr class="cl" onclick="$('#igP').value='${p.usuario}';renderIg()"${ub?' style="font-weight:600"':""}><td>${ub?'<span style="color:var(--marca)">●</span> ':""}<a href="https://www.instagram.com/${esc(p.usuario)}/" target="_blank" rel="noopener" onclick="event.stopPropagation()">@${esc(p.usuario)}</a><div class="small muted">${esc(p.nome)} · ${esc(TM[p.tipo]||"")}</div></td><td>${fmt(p.seguidores)}</td><td>${fmt(p.posts_total)}</td><td>${m.pm!=null?m.pm.toLocaleString("pt-BR",{maximumFractionDigits:1}):"—"}</td><td>${fmt(m.cpp)}</td><td>${m.eng!=null?pct(m.eng):"—"}</td><td>${m.vid!=null?pct(m.vid):"—"}</td><td class="small mono">${esc((m.ult||"").split("-").reverse().join("/"))}</td></tr>`}).join("");
+    $("#igP").innerHTML='<option value="">Todos os perfis</option>'+P.map(p=>`<option value="${p.usuario}">@${esc(p.usuario)}</option>`).join("");
+    $("#igP").oninput=renderIg;let t;$("#igQ").oninput=()=>{clearTimeout(t);t=setTimeout(renderIg,200)};renderIg()}
+  else $("#igK").innerHTML='<div class="empty">Rode coleta/instagram_concorrentes.py</div>';
+  const T=R.trends;if(!T)return;const S=T.termos.serie.filter(x=>!x.parcial);
+  chart("chTr",{type:"line",data:{labels:S.map(x=>x.semana),datasets:[{label:"chopp",data:S.map(x=>x.chopp),borderColor:"#0f62fe",pointRadius:0,borderWidth:1.5},{label:"cerveja artesanal",data:S.map(x=>x["cerveja artesanal"]),borderColor:"#8a3ffc",pointRadius:0,borderWidth:1.5}]},options:{plugins:{legend:{position:"top",align:"end"}},scales:{x:{ticks:{maxTicksLimit:10,callback:function(v){return String(this.getLabelForValue(v)).slice(0,7)}}}}}});
+  const sz=T.sazonalidade;$("#trCap").textContent=`Meses mais fortes para «chopp»: ${sz.meses_mais_altos.join(", ")}; mais fracos: ${sz.meses_mais_baixos.join(", ")}. ${T.geo_observacao||""}`;
+  const Mr=T.marcas,amb=Mr.ambiguas||{};$("#trMarcas").innerHTML=`<div class="tw"><table><thead><tr><th>Marca</th><th>Semanas com busca</th><th>Pico</th></tr></thead><tbody>${Object.entries(Mr.resumo).map(([k,v])=>`<tr${/uberbrau/i.test(k)?' style="font-weight:600"':""}><td>${esc(k)}${amb[k]?' <span class="pill">palavra comum</span>':""}</td><td>${v.semanas_acima_de_zero} de ${Mr.serie.length}</td><td>${v.maximo}</td></tr>`).join("")}</tbody></table></div>`;
+  $("#trMcap").textContent=(Mr.observacao||"")+(Object.keys(amb).length?" "+Object.entries(amb).map(([k,v])=>k+": "+v).join(" "):"");
+  const lst=a=>{const mx=Math.max(...a.map(x=>+x.valor||0),1);return a.slice(0,15).map(x=>`<div class="hbar"><span class="t" title="${esc(x.consulta)}">${esc(x.consulta)}</span><span class="b"><i style="width:${100*(+x.valor||0)/mx}%"></i></span><span class="n">${esc(x.valor)}</span></div>`).join("")||'<div class="empty">—</div>'};
+  $("#trTop").innerHTML=lst(T.relacionadas.top);$("#trRis").innerHTML=lst(T.relacionadas.rising);
+  const G=T.navegador;if(!G){$("#trGeo").style.display="none";return}
+  const hb=(a,real)=>a.map((x,i)=>`<div class="hbar"><span class="t"${real(x.nome)?' style="font-weight:600;color:var(--tx)"':""}>${i+1}º ${esc(x.nome)}</span><span class="b"><i style="width:${x.indice}%${real(x.nome)?";background:var(--marca)":""}"></i></span><span class="n">${x.indice}</span></div>`).join("");
+  $("#trEst").innerHTML=hb(G.estados,n=>n==="Minas Gerais");$("#trCid").innerHTML=hb(G.cidades_mg,n=>/uberl|uberaba|frutal|monte carmelo|arax|patos de minas|iturama|concei..o das alagoas/i.test(nrm(n)));
+  $("#trCidCap").textContent="Em destaque, o Triângulo e o Alto Paranaíba. "+G.observacao};
+function renderIg(){const u=$("#igP").value,q=nrm($("#igQ").value.trim());const out=[];IG.perfis.filter(p=>!u||p.usuario===u).forEach(p=>(p.posts||[]).forEach(x=>{if(q&&!nrm(x.legenda).includes(q))return;out.push([p,x])}));out.sort((a,b)=>(b[1].data||"").localeCompare(a[1].data||""));$("#igN").textContent=out.length+" posts";
+  $("#igL").innerHTML=out.map(([p,x])=>`<div class="news"><div style="min-width:110px"><div class="small" style="font-weight:600">@${esc(p.usuario)}</div><div class="small muted mono">${esc((x.data||"").split("-").reverse().join("/"))}</div><div class="small muted">${esc(x.tipo==="Video"?"vídeo":x.tipo==="Sidecar"?"carrossel":"foto")}</div></div><div style="flex:1;min-width:0"><div style="white-space:pre-line">${esc(x.legenda||"(sem legenda)")}</div><div class="small muted" style="margin-top:6px">♥ ${fmt(x.curtidas>0?x.curtidas:null)} · 💬 ${fmt(x.comentarios)}${x.views?" · ▶ "+fmt(x.views):""} · <a href="${esc(x.url)}" target="_blank" rel="noopener">abrir</a></div></div></div>`).join("")||'<div class="empty">Nenhum post</div>'}
+
+/* UNIVERSITÁRIOS */
+let unAtual=[];
+RENDER.univ=()=>{const N=R.inep;if(!N){$("#unK").innerHTML='<div class="empty">Rode coleta/inep_uberlandia.py</div>';return}const U=N.uberlandia,ser=N.serie_presencial_uberlandia,an=Object.keys(ser).sort();
+  $("#unK").innerHTML=[["Universitários presenciais",fmt(U.presencial.matriculas),`${an[0]}: ${fmt(ser[an[0]])} · ano-ref. ${N.ano}`],["Calouros por ano",fmt(U.presencial.ingressantes),"ingressantes no presencial — a festa de recepção"],["Formandos por ano",fmt(U.presencial.concluintes),"concluintes no presencial — as formaturas"],["EaD (à parte)",fmt(U.ead.matriculas),"matriculados em polos da cidade; não é público de festa"]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${PAL[i]}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+  const I=N.instituicoes.filter(i=>i.presencial.matriculas>0);
+  $("#tUnI").innerHTML=I.map(i=>`<tr><td><b>${esc(i.sigla||i.nome)}</b>${i.sigla?`<div class="small muted">${esc(i.nome)}</div>`:""}</td><td class="small">${esc(i.rede)}</td><td>${fmt(i.presencial.matriculas)}</td><td>${fmt(i.presencial.ingressantes)}</td><td>${fmt(i.presencial.concluintes)}</td><td class="muted">${fmt(i.ead.matriculas)}</td></tr>`).join("");
+  const C=Object.values(N.comparacao).sort((a,b)=>b.presencial.matriculas-a.presencial.matriculas);
+  chart("chUn",{type:"bar",data:{labels:C.map(c=>c.nome),datasets:[{label:"Presencial",data:C.map(c=>c.presencial.matriculas),backgroundColor:C.map(c=>/uberl/i.test(c.nome)?"#f2a516":"#0f62fe")},{label:"EaD",data:C.map(c=>c.ead.matriculas),backgroundColor:"#c6c6c6"}]},options:{indexAxis:"y",plugins:{legend:{position:"top",align:"end"}}}});
+  $("#unF").innerHTML+=[...new Set(N.top_cursos_presenciais.map(c=>c.sigla||c.instituicao))].map(x=>`<option>${esc(x)}</option>`).join("");$("#unF").oninput=renderUn;renderUn()};
+function renderUn(){const f=$("#unF").value;unAtual=R.inep.top_cursos_presenciais.filter(c=>!f||(c.sigla||c.instituicao)===f);
+  $("#tUnC").innerHTML=unAtual.map(c=>`<tr><td><b>${esc(c.curso)}</b></td><td class="small">${esc(c.sigla||c.instituicao)}</td><td class="small">${esc(c.turno||"—")}</td><td class="small muted">${esc(c.area||"")}</td><td>${fmt(c.matriculas)}</td><td>${fmt(c.ingressantes)}</td><td>${fmt(c.concluintes)}</td></tr>`).join("")}
+function csvUn(){download("uberlandia_cursos_presenciais.csv",[["Curso","Instituição","Turno","Área","Matrículas","Ingressantes","Concluintes"],...unAtual.map(c=>[c.curso,c.sigla||c.instituicao,c.turno,c.area,c.matriculas,c.ingressantes,c.concluintes])])}
+
+/* CLIMA E SAZONALIDADE */
+RENDER.clima=()=>{const K=R.clima;if(!K){$("#clK").innerHTML='<div class="empty">Rode coleta/clima_uberlandia.py</div>';return}const M=K.mensal,MS=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const tr=R.trends?.sazonalidade?.indice_medio_por_mes||{},n1=x=>x==null?"—":(+x).toLocaleString("pt-BR",{maximumFractionDigits:1});
+  const quente=M.slice().sort((a,b)=>(b.dias_max_30||0)-(a.dias_max_30||0))[0],chuv=M.slice().sort((a,b)=>(b.chuva_mm||0)-(a.chuva_mm||0))[0],seco=M.filter(m=>(m.chuva_mm||0)<40).map(m=>MS[m.mes-1]);
+  const ideal=M.filter(m=>(m.dias_max_30||0)>=15&&(m.dias_chuva_1mm||0)<=5).map(m=>MS[m.mes-1]);
+  $("#clK").innerHTML=[["Mês mais quente",MS[quente.mes-1],`${n1(quente.dias_max_30)} dias com máxima ≥ 30 °C`],["Mês mais chuvoso",MS[chuv.mes-1],`${fmt(chuv.chuva_mm)} mm em ${n1(chuv.dias_chuva_1mm)} dias`],["Janela ideal ao ar livre",ideal.join(", ")||"—","quente e com até 5 dias de chuva"],["Estação seca",seco.join(", ")||"—","menos de 40 mm no mês"]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${PAL[i]}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+  chart("chCl",{data:{labels:MS,datasets:[{type:"bar",label:"Chuva (mm)",data:M.map(m=>m.chuva_mm),backgroundColor:"#1192e8",yAxisID:"y1"},{type:"line",label:"Máxima média (°C)",data:M.map(m=>m.temp_max_media),borderColor:"#fa4d56",tension:.3,yAxisID:"y"},{type:"line",label:"Temp. média (°C)",data:M.map(m=>m.temp_media),borderColor:"#f2a516",tension:.3,yAxisID:"y"}]},options:{plugins:{legend:{position:"top",align:"end"}},scales:{y:{position:"left",title:{display:true,text:"°C"}},y1:{position:"right",grid:{drawOnChartArea:false},title:{display:true,text:"mm"}}}}});
+  chart("chClT",{data:{labels:MS,datasets:[{type:"bar",label:"Dias ≥ 30 °C",data:M.map(m=>m.dias_max_30),backgroundColor:"#ff832b",yAxisID:"y"},{type:"line",label:"Busca «chopp» (MG)",data:MS.map(m=>tr[m]??null),borderColor:"#0f62fe",tension:.3,yAxisID:"y1"}]},options:{plugins:{legend:{position:"top",align:"end"}},scales:{y:{position:"left"},y1:{position:"right",grid:{drawOnChartArea:false}}}}});
+  $("#clCap").textContent=`${K.estacao.nome||"Uberlândia"} (INMET ${K.estacao.codigo}), média ${K.anos[0]}–${K.anos[K.anos.length-1]}.${(K.avisos||[]).length?" "+K.avisos.join(" "):""}`;
+  const tv=Object.values(tr),tm=tv.length?tv.reduce((a,b)=>a+b,0)/tv.length:null;
+  const leitura=m=>{const t=[];if((m.dias_max_30||0)>=20)t.push("calor forte: chopp em alta");else if((m.dias_max_30||0)>=12)t.push("quente");if((m.dias_chuva_1mm||0)>=12)t.push("chuva frequente: evento coberto");else if((m.chuva_mm||0)<40)t.push("seco: ar livre seguro");const b=tr[MS[m.mes-1]];if(b!=null&&tm&&b>tm*1.1)t.push("busca por chopp acima da média");return t.join(" · ")};
+  $("#tCl").innerHTML=M.map(m=>`<tr><td><b>${MS[m.mes-1]}</b></td><td>${n1(m.temp_media)} °C</td><td>${n1(m.temp_max_media)} °C</td><td>${n1(m.dias_max_30)}</td><td>${fmt(m.chuva_mm)} mm</td><td>${n1(m.dias_chuva_1mm)}</td><td>${n1(tr[MS[m.mes-1]])}</td><td class="small">${esc(leitura(m))}</td></tr>`).join("")};
+
+/* COMENTÁRIOS NO GOOGLE */
+const OP=R.opinioes;
+const TEMA_CH={"Chopp e cerveja":["chop","cervej","ipa","pilsen","gelad","growler","barril"],"Atendimento":["atend","garc","educad","simpat","grosso","grosseir","mal tratad","gerente","funcionari"],"Demora":["demor","espera","aguard","lento","40 min","uma hora","1 hora"],"Preço":["prec","caro","barat","valor","custo","cobra","conta"],"Comida":["comida","petisc","porca","hamburg","lanche","sanduich","pizza","torresmo","prato","carne","sabor"],"Ambiente e música":["ambiente","musica","som ","banda","ao vivo","show","aconcheg","barulh","lugar"],"Evento e festa":["evento","festa","aniversari","confraterniz","casamento","formatura","chopeira"],"Entrega":["entreg","delivery","pedido","ifood"],"Pagamento":["cartao","pix","qr code","dinheiro","pagamento"],"Limpeza e banheiro":["banheiro","limp","sujo","sujeira"],"Estacionamento":["estacion","vaga"]};
+const temaDe=(t,tema)=>TEMA_CH[tema].some(k=>nrm(t).includes(k));
+const somaTemas=ls=>{const o={};ls.forEach(l=>Object.entries(l.temas).forEach(([k,[b,r]])=>{o[k]=o[k]||[0,0];o[k][0]+=b;o[k][1]+=r}));return o};
+const estr=n=>n?"★".repeat(n)+'<span class="muted">'+"★".repeat(5-n)+"</span>":"";
+RENDER.opinioes=()=>{if(!OP){$("#opK").innerHTML='<div class="empty">Rode coleta/maps_reviews.py</div>';return}
+  const L_=OP.lugares,U=L_.filter(l=>l.tipo==="uberbrau"),C=L_.filter(l=>l.tipo!=="uberbrau");
+  const soma=(ls,k)=>ls.reduce((s,l)=>s+(l[k]||0),0),taxa=(ls,k)=>soma(ls,"amostra")?100*soma(ls,k)/soma(ls,"amostra"):0;
+  const bar=U.slice().sort((a,b)=>(b.av||0)-(a.av||0))[0];
+  $("#opK").innerHTML=[["Nota da Uberbrau no Google",bar?String(bar.nota).replace(".",",")+" ★":"—",bar?`${fmt(bar.av)} avaliações · ${bar.nome}`:""],["Dono respondeu — Uberbrau",pct(taxa(U,"respondidos")),`${soma(U,"respondidos")} de ${soma(U,"amostra")} comentários lidos`],["Dono respondeu — concorrentes",pct(taxa(C,"respondidos")),`${soma(C,"respondidos")} de ${soma(C,"amostra")} comentários lidos`],["Comentários lidos",fmt(soma(L_,"amostra")),`${L_.length} lugares · coletado em ${OP.coletado_em.split("-").reverse().join("/")}`]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${PAL[i]}"><div class="l">${l}</div><div class="v">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+  const tu=somaTemas(U),tc=somaTemas(C);
+  const melhor=Object.entries(tu).sort((a,b)=>b[1][0]-a[1][0])[0],pior=Object.entries(tu).sort((a,b)=>b[1][1]-a[1][1])[0];
+  const resp=C.filter(l=>l.respondidos>=l.amostra/3).map(l=>l.nome.split(" - ")[0]);
+  const chop=U.flatMap(l=>l.comentarios).filter(c=>c.n<=3&&/chopeira|sangria/.test(nrm(c.t)));
+  const evC=C.filter(l=>(l.temas["Evento e festa"]||[0])[0]>=3).map(l=>l.nome.split(" - ")[0]);
+  $("#opLeit").innerHTML=`<ul style="margin:0;padding-left:18px;line-height:1.7">
+    ${melhor?`<li>O que mais se elogia na Uberbrau: <b>${esc(melhor[0].toLowerCase())}</b> (${melhor[1][0]} menções em comentários de 4–5 estrelas).</li>`:""}
+    ${pior?`<li>O que mais se critica: <b>${esc(pior[0].toLowerCase())}</b> (${pior[1][1]} menções em comentários de 1–3 estrelas).</li>`:""}
+    <li>A Uberbrau respondeu <b>${pct(taxa(U,"respondidos"))}</b> dos comentários lidos; os concorrentes, ${pct(taxa(C,"respondidos"))}.${resp.length?` Respondem com frequência: ${esc(resp.join(", "))}.`:""}</li>
+    ${evC.length?`<li>Quem é elogiado por <b>evento e festa</b>: ${esc(evC.join(", "))} — é a disputa direta pelo barril do evento.</li>`:""}
+    ${chop.length?`<li>${chop.length===1?"Uma crítica":chop.length+" críticas"} ao serviço de chopp para evento da Uberbrau (chopeira, sangria, retorno) — leia em «Ler os comentários», tema «Evento e festa».</li>`:""}</ul>`;
+  $("#tTemas").innerHTML=OP.temas.map(t=>{const u=tu[t]||[0,0],c=tc[t]||[0,0];const cel=([b,r])=>`<span style="color:var(--ok)">${b}</span> / <span style="color:var(--bad)">${r}</span>`;return`<tr class="cl" onclick="$('#opT').value='${esc(t)}';$('#opL').value='';renderOp();document.getElementById('opLista').scrollIntoView({behavior:'smooth'})"><td><b>${esc(t)}</b></td><td>${cel(u)}</td><td>${cel(c)}</td></tr>`}).join("");
+  const top=(l,i)=>{const e=Object.entries(l.temas).sort((a,b)=>b[1][i]-a[1][i])[0];return e&&e[1][i]?esc(e[0]):'<span class="muted">—</span>'};
+  $("#tOp").innerHTML=L_.map((l,i)=>`<tr class="cl" onclick="$('#opL').value='${i}';$('#opT').value='';renderOp();document.getElementById('opLista').scrollIntoView({behavior:'smooth'})"${l.tipo==="uberbrau"?' style="font-weight:600"':""}><td>${l.tipo==="uberbrau"?'<span style="color:var(--marca)">●</span> ':""}${esc(l.nome)}<div class="small muted">${esc(TM[l.tipo]||"")}</div></td><td>${String(l.nota||"—").replace(".",",")} ★<div class="small muted">${fmt(l.av)} aval.</div></td><td>${l.amostra}</td><td class="small">${esc((l.de||"").slice(0,7))} a ${esc((l.ate||"").slice(0,7))}</td><td style="${l.criticas/l.amostra>.15?"color:var(--bad)":""}">${pct(100*l.criticas/l.amostra)}</td><td>${pct(100*l.respondidos/l.amostra)}</td><td class="small">${top(l,0)}</td><td class="small">${top(l,1)}</td></tr>`).join("");
+  $("#opL").innerHTML='<option value="">Todos os lugares</option>'+L_.map((l,i)=>`<option value="${i}">${esc(l.nome)}</option>`).join("");
+  $("#opL").value=String(L_.indexOf(bar));$("#opT").innerHTML+=OP.temas.map(t=>`<option>${esc(t)}</option>`).join("");
+  renderBevInit();
+  ["#opL","#opT","#opN"].forEach(x=>$(x).oninput=renderOp);let tq;$("#opQ").oninput=()=>{clearTimeout(tq);tq=setTimeout(renderOp,200)};renderOp()};
+function renderBevInit(){const B=R.bebida_eventos;if(!B){$("#bevCard").style.display="none";return}const L_=B.lugares;
+  const tot=L_.reduce((s,l)=>s+l.comentarios.length,0),cr=L_.reduce((s,l)=>s+l.comentarios.filter(c=>c.n<=3).length,0);
+  $("#bevSub").textContent=`${B.consultados} espaços de evento, bufês, cerimoniais e empresas de formatura consultados; ${L_.length} têm comentário que fala de ${B.palavras.map(p=>"«"+p+"»").join(" ou ")} — ${fmt(tot)} comentários, ${fmt(cr)} críticas. Quem critica a bebida é conversa de venda; quem elogia já serve bem.`;
+  $("#tBev").innerHTML=L_.map((l,i)=>{const c=l.comentarios.filter(x=>x.n<=3).length;return`<tr class="cl" onclick="$('#bevL').value='${i}';renderBev()"><td>${esc(l.nome)}<div class="small muted">${esc(TM[l.tipo]||"")}</div></td><td>${String(l.nota||"—").replace(".",",")} ★<div class="small muted">${fmt(l.av)} aval.</div></td><td>${l.comentarios.length}</td><td style="${c?"color:var(--bad);font-weight:600":""}">${c}</td></tr>`}).join("");
+  $("#bevL").innerHTML='<option value="">Todos os lugares</option>'+L_.map((l,i)=>`<option value="${i}">${esc(l.nome)}</option>`).join("");
+  ["#bevL","#bevN"].forEach(x=>$(x).oninput=renderBev);renderBev()}
+function renderBev(){const B=R.bebida_eventos,li=$("#bevL").value,nt=$("#bevN").value,out=[];(li===""?B.lugares:[B.lugares[+li]]).forEach(l=>l.comentarios.forEach(c=>{if(nt==="c"&&!(c.n<=3))return;if(nt==="e"&&!(c.n>=4))return;out.push([l,c])}));
+  out.sort((a,b)=>(a[1].n-b[1].n)||(b[1].d||"").localeCompare(a[1].d||""));$("#bevCnt").textContent=out.length+" comentários";
+  const hl=t=>esc(t).replace(/(chop+e?|bebida|cerveja|gelad[ao]|open bar)/gi,"<mark>$1</mark>");
+  $("#bevLista").innerHTML=out.map(([l,c])=>`<div class="news"><div style="min-width:92px"><div style="color:#f1c21b;letter-spacing:1px">${estr(c.n)}</div><div class="small muted mono">${esc((c.d||"").split("-").reverse().join("/"))}</div></div><div style="flex:1;min-width:0">${li===""?`<div class="small" style="font-weight:600">${esc(l.nome)}</div>`:""}<div>${hl(c.t)}</div>${c.r?`<div class="quote" style="margin-top:8px"><span class="small muted">Resposta do dono</span><br>${esc(c.r)}</div>`:""}</div></div>`).join("")||'<div class="empty">Nenhum comentário neste filtro</div>'}
+function renderOp(){const li=$("#opL").value,t=$("#opT").value,nt=$("#opN").value,q=nrm($("#opQ").value.trim());
+  const ls=li===""?OP.lugares:[OP.lugares[+li]];const out=[];
+  ls.forEach(l=>l.comentarios.forEach(c=>{if(t&&!temaDe(c.t,t))return;if(nt==="c"&&!(c.n<=3))return;if(nt==="e"&&!(c.n>=4))return;if(q&&!nrm(c.t).includes(q))return;out.push([l,c])}));
+  out.sort((a,b)=>(b[1].d||"").localeCompare(a[1].d||""));$("#opCnt").textContent=out.length+" comentários";
+  $("#opLista").innerHTML=out.slice(0,300).map(([l,c])=>`<div class="news"><div style="min-width:92px"><div style="color:#f1c21b;letter-spacing:1px">${estr(c.n)}</div><div class="small muted mono">${esc((c.d||"").split("-").reverse().join("/"))}</div></div><div style="flex:1;min-width:0">${li===""?`<div class="small" style="font-weight:600">${esc(l.nome)}</div>`:""}<div>${esc(c.t)}</div>${c.r?`<div class="quote" style="margin-top:8px"><span class="small muted">Resposta do dono</span><br>${esc(c.r)}</div>`:""}</div></div>`).join("")||'<div class="empty">Nenhum comentário neste filtro</div>'}
+
+/* ECONOMIA E MÍDIA LOCAL */
+let emAtual=[];
+RENDER.cidade=()=>{const P=R.publicos;if(!P){$("#cdK").innerHTML='<div class="empty">Rode coleta/publicos_uberlandia.py</div>';return}
+  const U="3170206",pb=P.pib,ip=P.ips.cidades,pop=c=>ip[c]?.["POPULAÇÃO 2025"]||(R.pix?.cidades[c]?.pop);
+  const pu=pb[U].pib,anos=Object.keys(pu).sort(),ult=anos[anos.length-1],cres=c=>{const a=pb[c].pib;return a["2019"]&&a[ult]?100*(a[ult]/a["2019"]-1):null};
+  const fm=P.emissoras.filter(e=>e.servico==="FM"),tv=P.emissoras.filter(e=>!["FM","OM"].includes(e.servico));
+  $("#cdK").innerHTML=[["PIB "+ult,brl(pu[ult]),"+"+pct(cres(U))+" desde 2019"],["PIB por habitante",brl(pu[ult]/pop(U)),"população 2025: "+fmt(pop(U))],["Progresso Social (IPS)",ip[U]?String(ip[U]["Índice de Progresso Social"]).replace(".",","):"—",ip[U]?`${ip[U].rank_mg}º de ${fmt(P.ips.municipios_mg)} municípios de MG`:""],["Emissoras com outorga",fmt(P.emissoras.length),`${fm.length} rádios FM · ${tv.length} canais de TV`]].map(([l,v,x],i)=>`<div class="card kpi" style="--kc:${PAL[i]}"><div class="l">${l}</div><div class="v" style="font-size:24px">${v}</div><div class="s">${esc(x)}</div></div>`).join("");
+  chart("chPib",{type:"bar",data:{labels:anos,datasets:[{data:anos.map(a=>pu[a]),backgroundColor:"#0f62fe",borderRadius:0}]},options:{plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>brl(c.raw)}}},scales:{y:{ticks:{callback:v=>brl(v)}}}}});
+  const v=pb[U].vab2021,VK=[["servicos","Serviços"],["industria","Indústria"],["adm_publica","Administração pública"],["agro","Agropecuária"]];
+  chart("chVab",{type:"doughnut",data:{labels:VK.map(k=>k[1]),datasets:[{data:VK.map(k=>v[k[0]]),backgroundColor:PAL,borderWidth:0}]},options:{plugins:{legend:{position:"right"},tooltip:{callbacks:{label:c=>c.label+": "+brl(c.raw)+" ("+pct(100*c.raw/v.vab)+")"}}}}});
+  $("#tCid").innerHTML=Object.entries(pb).sort((a,b)=>(ip[b[0]]?.["Índice de Progresso Social"]||0)-(ip[a[0]]?.["Índice de Progresso Social"]||0)).map(([c,x])=>`<tr${c===U?' style="background:rgba(242,165,22,.12)"':""}><td><b>${esc(x.nome)}</b></td><td>${fmt(pop(c))}</td><td>${brl(x.pib[ult])}</td><td>${pop(c)?brl(x.pib[ult]/pop(c)):"—"}</td><td>${pct(cres(c))}</td><td>${ip[c]?String(ip[c]["Índice de Progresso Social"]).replace(".",","):"—"}</td><td>${ip[c]?.rank_mg?ip[c].rank_mg+"º":"—"}</td></tr>`).join("");
+  const outras=Object.keys(ip).filter(c=>c!==U),media=k=>{const a=outras.map(c=>ip[c][k]).filter(x=>x!=null);return a.length?a.reduce((s,x)=>s+x,0)/a.length:null};
+  const COMP=["Nutrição e Cuidados Médicos Básicos","Água e Saneamento","Moradia","Segurança Pessoal","Acesso ao Conhecimento Básico","Acesso à Informação e Comunicação","Saúde e Bem-estar","Qualidade do Meio Ambiente","Direitos Individuais","Liberdades Individuais e de Escolha","Inclusão Social","Acesso à Educação Superior"];
+  $("#ipsComp").innerHTML=ip[U]?COMP.map(k=>{const u=ip[U][k],m=media(k);return`<div class="hbar"><span class="t" title="${esc(k)}">${esc(k)}</span><span class="b" style="position:relative"><i style="width:${u||0}%"></i>${m!=null?`<b style="position:absolute;top:-2px;left:${m}%;width:2px;height:12px;background:var(--tx)"></b>`:""}</span><span class="n">${u!=null?String(u).replace(".",","):"—"}</span></div>`}).join(""):'<div class="empty">—</div>';
+  const SEL=[["Expectativa de Vida","anos",0],["Empregados com Ensino Superior","por mil empregados",0],["Nota Mediana no Enem","pontos",0],["Cobertura de Internet Móvel (4G/5G)","% da população",0],["Densidade de Internet Banda Larga Fixa","acessos por 100 domicílios",0],["Consumo de ultraprocessados","índice",1],["Homicídios","por 100 mil hab.",1],["Mortes por Acidentes de Transporte","por 100 mil hab.",1]];
+  $("#ipsSel").innerHTML=ip[U]?`<dl class="kv">${SEL.map(([k,un,menor])=>{const u=ip[U][k],m=media(k);const melhor=u!=null&&m!=null?(menor?u<m:u>m):null;return`<dt>${esc(k)}</dt><dd><b>${u!=null?String(u).replace(".",","):"—"}</b> <span class="muted">${esc(un)}</span>${m!=null?` · média das outras ${String(m.toFixed(1)).replace(".",",")} <span style="color:${melhor?"#4ade80":"#f87171"}">${melhor?"▲ melhor":"▼ pior"}</span>`:""}</dd>`}).join("")}</dl>`:"";
+  $("#ipsCap").textContent="IPS Brasil 2026. Mortes no trânsito pesam para quem vende bebida: a campanha de consumo responsável fala direto com esse número.";
+  ["#emT","#emLic"].forEach(x=>$(x).oninput=renderEm);renderEm()};
+function renderEm(){const t=$("#emT").value,lic=$("#emLic").checked;emAtual=R.publicos.emissoras.filter(e=>(!t||(t==="FM"?e.servico==="FM":!["FM","OM"].includes(e.servico)))&&(!lic||e.status.startsWith("Canal Licenciado")));$("#emN").textContent=emAtual.length+" emissoras";
+  $("#tEm").innerHTML=emAtual.map(e=>`<tr><td class="small">${esc(e.tipo)}${e.educativa?' <span class="pill">educativa</span>':""}</td><td><b>${esc(e.servico==="FM"?e.freq+" FM":"canal "+(e.canal||"—"))}</b></td><td>${esc(e.fantasia||"—")}</td><td class="small">${esc(e.entidade||"—")}</td><td class="small ${e.status.startsWith("Canal Licenciado")?"":"muted"}">${esc(e.status.replace("Canal ",""))}</td></tr>`).join("")||'<tr><td colspan=5 class="empty">—</td></tr>'}
+function csvEm(){download("uberlandia_emissoras.csv",[["Tipo","Frequência (MHz) / canal","Emissora","Empresa titular","CNPJ","Indicativo","Situação","Educativa"],...emAtual.map(e=>[e.tipo,e.servico==="FM"?e.freq:e.canal,e.fantasia,e.entidade,e.cnpj,e.indicativo,e.status,e.educativa?"sim":"não"])])}
+
+/* BASES */
+RENDER.bases=()=>{const B=[["Receita Federal — CNPJ (base local)",`${fmt(NE)} empresas ativas em Uberlândia, com atividade, porte, sócios, telefone e e-mail registrados`,"grátis"],["IBGE — CNEFE 2022",`coordenada de cada endereço da cidade; posiciona as empresas por CEP + número`,"grátis"],["IBGE — Censo 2022 por setor",`moradores, idade, domicílio e renda do responsável em ${fmt(R.setores.length)} setores`,"grátis"],["Banco Central — Pix por município","dinheiro que gira na cidade e no comércio, 36 meses, sazonalidade","grátis"],["Agenda pública da cidade",`${R.publico.length} organizadores e ${R.calendario.length} eventos do calendário, cada um com link da fonte`,"grátis"],["Google Maps (Apify)",`${fmt(LG.length)} lugares em Uberlândia — concorrentes, bares, espaços e quem faz evento, com nota, avaliações, telefone, site e Instagram`,R.maps_custo?"pago · US$ "+R.maps_custo.toFixed(2).replace(".",","):"pago"],["IBGE — PIB dos Municípios",R.publicos?`PIB 2019–2023 e valor adicionado por setor de ${Object.keys(R.publicos.pib).length} cidades de Minas`:"—","grátis"],["IPS Brasil 2026",R.publicos?`Índice de Progresso Social: 12 componentes e ${R.publicos.ips.campos.length} indicadores, comparado entre ${R.publicos.ips.municipios_mg} municípios de MG`:"—","grátis"],["Ministério das Comunicações / Anatel",R.publicos?`${R.publicos.emissoras.length} rádios e TVs com outorga em Uberlândia, com a empresa titular`:"—","grátis"],["Google Maps — comentários",R.opinioes?`${fmt(R.opinioes.lugares.reduce((s,l)=>s+l.amostra,0))} comentários recentes de ${R.opinioes.lugares.length} lugares (Uberbrau e concorrentes), sem dado pessoal de quem comentou`:"—",R.opinioes&&R.opinioes.custo?"pago · US$ "+R.opinioes.custo.toFixed(2).replace(".",","):"pago"],["MAPA — SIPEAGRO e Anuário da Cerveja",R.mapa?`${R.mapa.uberlandia.ativas_fabrica_propria} cervejarias com fábrica em Uberlândia, ${R.mapa.regiao.total_ativas} no Triângulo/Alto Paranaíba e o ranking de MG e do Brasil`:"—","grátis"],["Receita Federal — abertura e baixa",R.dinamica?`empresas abertas e baixadas por ano desde ${R.dinamica.anos[0]}, por segmento (atividade principal)`:"—","grátis"],["Ministério do Trabalho — Novo CAGED",R.caged?`admissões, desligamentos e salário de entrada por segmento em Uberlândia, ${R.caged.meses.length} meses`:"—","grátis"],["INEP — Censo da Educação Superior",R.inep?`${fmt(R.inep.uberlandia.presencial.matriculas)} universitários presenciais em ${R.inep.instituicoes.filter(i=>i.presencial.matriculas>0).length} instituições (${R.inep.ano})`:"—","grátis"],["INMET — estação automática A507",R.clima?`temperatura e chuva diárias de ${R.clima.anos[0]} a ${R.clima.anos[R.clima.anos.length-1]}`:"—","grátis"],["Google Trends",R.trends?"interesse de busca por chopp, cerveja artesanal e marcas em MG, 5 anos":"—","grátis"],["Instagram",R.instagram?`${R.instagram.perfis.filter(p=>p.seguidores).length} perfis públicos de empresa (Uberbrau e concorrentes) e seus 12 posts mais recentes`:"—",R.instagram?"pago · US$ "+(R.instagram.custo_usd||0).toFixed(2).replace(".",","):"pago"],["Google Maps — bebida nos espaços de evento",R.bebida_eventos?`${R.bebida_eventos.lugares.reduce((s,l)=>s+l.comentarios.length,0)} comentários que falam de chopp ou bebida em ${R.bebida_eventos.lugares.length} espaços, bufês e cerimoniais`:"—",R.bebida_eventos?"pago · US$ "+(R.bebida_eventos.custo||0).toFixed(2).replace(".",","):"pago"],["OpenStreetMap",Object.entries(R.osm||{}).map(([k,v])=>fmt(v.length)+" "+({ensino_superior:"ensino superior",escola:"escolas",onibus:"paradas de ônibus",bar:"bares",noite:"casas noturnas",restaurante:"restaurantes",evento:"locais de evento",estadio:"estádios e ginásios",parque:"parques",shopping:"shoppings",bebidas:"lojas de bebida"}[k]||k)).join(" · ")||"—","grátis"]];
+  $("#lBases").innerHTML=B.map(([n,o,c])=>`<div class="card"><div style="display:flex;justify-content:space-between;gap:10px"><b>${esc(n)}</b><span class="pill" style="${/grátis/.test(c)?"color:#4ade80":""}">${esc(c)}</span></div><div class="small muted" style="margin-top:6px">${esc(o)}</div></div>`).join("")+(R.fontes_pub.length?`<div class="card" style="grid-column:1/-1"><h3>Fontes consultadas na agenda pública</h3>${R.fontes_pub.map(u=>`<div class="small"><a href="${esc(u)}" target="_blank">${esc(u)}</a></div>`).join("")}</div>`:"")};
+
+const h0=(location.hash||"#inicio").slice(1);ir(RENDER[h0]?h0:"inicio");$("#load").remove();
+</script>
+<script>(() => {
+  const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+  const de64 = (u) => { let s = ""; for (let i = 0; i < u.length; i += 8192) s += String.fromCharCode(...u.subarray(i, i + 8192)); return btoa(s); };
+  const C = JSON.parse(document.getElementById("cofre").textContent);
+  const $t = (id) => document.getElementById(id);
+  const SESSAO = "uberbrau-nuvem-chave";
+  const load = $t("load"); if (load) load.style.display = "none";
+
+  async function sha(t) {
+    const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(t));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  async function abrir(bruta) {
+    if (load) { load.textContent = "Abrindo o radar…"; load.style.display = "grid"; }
+    const K = await crypto.subtle.importKey("raw", bruta, "AES-GCM", false, ["decrypt"]);
+    const r = await fetch("dados.bin?v=" + C.versao, { cache: "no-store" });
+    if (!r.ok) throw new Error("dados.bin " + r.status);
+    const u = new Uint8Array(await r.arrayBuffer());
+    const gz = await crypto.subtle.decrypt({ name: "AES-GCM", iv: u.slice(0, 12) }, K, u.slice(12));
+    const txt = await new Response(new Blob([gz]).stream().pipeThrough(new DecompressionStream("gzip"))).text();
+    window.__R = JSON.parse(txt);
+    $t("trava").remove();
+    const s = document.createElement("script");
+    s.textContent = $t("app-js").textContent;
+    document.body.appendChild(s);
+  }
+
+  async function entrar(ev) {
+    ev.preventDefault();
+    const msg = $t("trava-msg");
+    msg.textContent = "conferindo…";
+    let bruta;
+    try {
+      const e = C.usuarios[await sha($t("trava-u").value.trim().toLowerCase())];
+      if (!e) throw new Error("x");
+      if (e.validade && new Date().toISOString().slice(0, 10) > e.validade) {
+        msg.textContent = "este acesso venceu em " + e.validade.split("-").reverse().join("/");
+        return;
+      }
+      const base = await crypto.subtle.importKey("raw", new TextEncoder().encode($t("trava-s").value), "PBKDF2", false, ["deriveKey"]);
+      const kek = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: b64(e.s), iterations: C.iter, hash: "SHA-256" },
+        base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+      bruta = new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(e.iv) }, kek, b64(e.c)));
+    } catch {
+      msg.textContent = "usuário ou senha incorretos";
+      return;
+    }
+    try { sessionStorage.setItem(SESSAO, de64(bruta)); } catch { /* aba anônima: pede de novo */ }
+    try { await abrir(bruta); } catch (err) {
+      if (load) load.style.display = "none";
+      msg.textContent = "não consegui abrir os dados — recarregue a página (" + err.message + ")";
+    }
+  }
+
+  $t("trava-form").addEventListener("submit", entrar);
+  let guardada = null;
+  try { guardada = sessionStorage.getItem(SESSAO); } catch { /* sem armazenamento */ }
+  if (guardada) {
+    abrir(b64(guardada)).catch(() => {
+      if (load) load.style.display = "none";
+      try { sessionStorage.removeItem(SESSAO); } catch { /* nada */ }
+    });
+  }
+})();</script>
+</body>
+</html>
